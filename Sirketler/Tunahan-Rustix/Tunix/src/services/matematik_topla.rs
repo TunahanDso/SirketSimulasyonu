@@ -10,6 +10,7 @@ struct MatematikToplaIstegi {
 
 #[derive(Debug, Serialize)]
 struct MatematikToplaSonucu {
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
     sonuc: Decimal,
 }
 
@@ -40,6 +41,7 @@ mod tests {
         let sonuc = calistir(r#"{"sayilar":[10,-3,5]}"#).expect("işlem başarılı olmalı");
         let json: Value = serde_json::from_str(&sonuc).expect("sonuç JSON olmalı");
 
+        assert!(json["sonuc"].is_number());
         assert_eq!(json["sonuc"], 12);
     }
 
@@ -48,6 +50,7 @@ mod tests {
         let sonuc = calistir(r#"{"sayilar":[0.1,0.2,1.25]}"#).expect("işlem başarılı olmalı");
         let json: Value = serde_json::from_str(&sonuc).expect("sonuç JSON olmalı");
 
+        assert!(json["sonuc"].is_number());
         assert_eq!(json["sonuc"].to_string(), "1.55");
     }
 
@@ -56,6 +59,7 @@ mod tests {
         let sonuc = calistir(r#"{"sayilar":[]}"#).expect("işlem başarılı olmalı");
         let json: Value = serde_json::from_str(&sonuc).expect("sonuç JSON olmalı");
 
+        assert!(json["sonuc"].is_number());
         assert_eq!(json["sonuc"], 0);
     }
 
