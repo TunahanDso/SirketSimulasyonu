@@ -1,8 +1,13 @@
 mod matematik_carp;
 mod matematik_topla;
+mod metin_karakter_say;
+mod metin_kelime_say;
+mod veri_ortalama_hesapla;
 
 use crate::protocol::{
     MATEMATIK_CARP, MATEMATIK_CARP_SURUMU, MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU,
+    METIN_KARAKTER_SAY, METIN_KARAKTER_SAY_SURUMU, METIN_KELIME_SAY,
+    METIN_KELIME_SAY_SURUMU, VERI_ORTALAMA_HESAPLA, VERI_ORTALAMA_HESAPLA_SURUMU,
 };
 
 #[derive(Debug)]
@@ -52,6 +57,15 @@ pub fn hizmeti_calistir(
         }
         (MATEMATIK_CARP, MATEMATIK_CARP_SURUMU) => {
             matematik_carp::calistir(istek_verisi_json)
+        }
+        (VERI_ORTALAMA_HESAPLA, VERI_ORTALAMA_HESAPLA_SURUMU) => {
+            veri_ortalama_hesapla::calistir(istek_verisi_json)
+        }
+        (METIN_KELIME_SAY, METIN_KELIME_SAY_SURUMU) => {
+            metin_kelime_say::calistir(istek_verisi_json)
+        }
+        (METIN_KARAKTER_SAY, METIN_KARAKTER_SAY_SURUMU) => {
+            metin_karakter_say::calistir(istek_verisi_json)
         }
         _ => Err(HizmetHatasi::DesteklenmeyenHizmet),
     }
