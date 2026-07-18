@@ -15,6 +15,8 @@ public sealed class TickYoneticisi
 
     private readonly MusteriYoneticisi _musteriYoneticisi;
 
+    private readonly IsYoneticisi _isYoneticisi;
+
     private long _tickNumarasi;
 
     private bool _calisiyor;
@@ -55,6 +57,12 @@ public sealed class TickYoneticisi
 
         _musteriYoneticisi =
             musteriYoneticisi;
+
+        _isYoneticisi =
+            new IsYoneticisi(
+                sirketYoneticisi,
+                musteriYoneticisi,
+                new SonucDogrulayicisi());
     }
 
     public async Task BaslatAsync(
@@ -190,24 +198,21 @@ public sealed class TickYoneticisi
                 .TickTalepleriniOlustur(
                     tickNumarasi);
 
-        /*
-         * IsYoneticisi henüz eklenmediği için
-         * talepler şu an yalnızca oluşturuluyor.
-         *
-         * Bir sonraki aşamada burada:
-         *
-         * await _isYoneticisi.TalepleriIsleAsync(
-         *     talepler,
-         *     cancellationToken);
-         *
-         * çağrısı yapılacak.
-         */
         TalepleriRaporla(
             tickNumarasi,
             talepler);
 
         /*
-         * 4. Müşteri kayıtları belirlenen tick
+         * 4. Talepler uygun şirketlere atanır,
+         *    şirket sonuçları doğrulanır ve ekonomi işlenir.
+         */
+        await _isYoneticisi.TalepleriIsleAsync(
+            tickNumarasi,
+            talepler,
+            cancellationToken);
+
+        /*
+         * 5. Müşteri kayıtları belirlenen tick
          *    aralığında disk üzerine yazılır.
          */
         await _musteriYoneticisi
@@ -216,7 +221,7 @@ public sealed class TickYoneticisi
                 cancellationToken);
 
         /*
-         * 5. Tick özeti konsola yazılır.
+         * 6. Tick özeti konsola yazılır.
          */
         TickOzetiniYaz(
             tickNumarasi,
