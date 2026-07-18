@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub const PROTOKOL_SURUMU: &str = "0.1";
 pub const SIRKET_KIMLIGI: &str = "tunahan-tunix";
 pub const SIRKET_ADI: &str = "Tunix";
-pub const SUNUCU_SURUMU: &str = "0.2.0";
+pub const SUNUCU_SURUMU: &str = "0.2.1";
 pub const MATEMATIK_TOPLA: &str = "matematik.topla";
 pub const MATEMATIK_TOPLA_SURUMU: &str = "1.0";
 
@@ -82,6 +82,7 @@ pub struct SirketTanitimMesaji {
 pub struct SunulanHizmet {
     pub hizmet_kimligi: &'static str,
     pub hizmet_surumu: &'static str,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
     pub birim_fiyat: Decimal,
     pub azami_eszamanli_is: u32,
     pub aktif: bool,
@@ -143,5 +144,7 @@ mod tests {
         assert_eq!(json["sirketKimligi"], SIRKET_KIMLIGI);
         assert_eq!(json["hizmetler"][0]["hizmetKimligi"], MATEMATIK_TOPLA);
         assert_eq!(json["hizmetler"][0]["azamiEszamanliIs"], 1);
+        assert!(json["hizmetler"][0]["birimFiyat"].is_number());
+        assert_eq!(json["hizmetler"][0]["birimFiyat"], 1);
     }
 }
