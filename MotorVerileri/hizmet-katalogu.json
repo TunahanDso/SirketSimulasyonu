@@ -1,0 +1,45 @@
+{
+  "katalogSurumu": "1.0",
+  "hizmetler": [
+    {
+      "hizmetKimligi": "matematik.topla",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Gönderilen sayıların toplamını hesaplar.",
+      "zamanAsimiMs": 2000,
+      "azamiIstekBoyutuByte": 4096,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "matematik.carp",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Gönderilen sayıların çarpımını hesaplar.",
+      "zamanAsimiMs": 2000,
+      "azamiIstekBoyutuByte": 4096,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "veri.ortalama-hesapla",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Gönderilen sayıların aritmetik ortalamasını hesaplar.",
+      "zamanAsimiMs": 2000,
+      "azamiIstekBoyutuByte": 4096,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "metin.kelime-say",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Gönderilen metindeki kelime sayısını hesaplar.",
+      "zamanAsimiMs": 2000,
+      "azamiIstekBoyutuByte": 8192,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "metin.karakter-say",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Gönderilen metindeki karakter sayısını hesaplar.",
+      "zamanAsimiMs": 2000,
+      "azamiIstekBoyutuByte": 8192,
+      "aktif": true
+    }
+  ]
+}

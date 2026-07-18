@@ -1,10 +1,27 @@
+using SirketMotoru.Hizmetler;
+
 namespace SirketMotoru.Protokol;
 
-public sealed class SirketTanitimMesaji : TemelMesaj
+public sealed class SirketTanitimMesaji
 {
-    public string SirketKimligi { get; set; } = string.Empty;
+    public string MesajTuru { get; init; } =
+        MesajTurleri.SirketTanitim;
 
-    public string SirketAdi { get; set; } = string.Empty;
+    public string MesajKimligi { get; init; } =
+        string.Empty;
 
-    public string SunucuSurumu { get; set; } = string.Empty;
+    public string ProtokolSurumu { get; init; } =
+        string.Empty;
+
+    public string SirketKimligi { get; init; } =
+        string.Empty;
+
+    public string SirketAdi { get; init; } =
+        string.Empty;
+
+    public string SunucuSurumu { get; init; } =
+        string.Empty;
+
+    public List<SunulanHizmet> Hizmetler { get; init; } =
+        [];
 }

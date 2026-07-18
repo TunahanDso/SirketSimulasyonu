@@ -1,0 +1,114 @@
+namespace SirketMotoru.Musteriler;
+
+public sealed class Musteri
+{
+    public string MusteriKimligi { get; set; } = string.Empty;
+
+    public string MusteriAdi { get; set; } = string.Empty;
+
+    public MusteriTuru MusteriTuru { get; set; }
+
+    public decimal Bakiye { get; set; }
+
+    public decimal TickBasinaHarcamaButcesi { get; set; }
+
+    public double TalepOlusturmaOlasiligi { get; set; }
+
+    public MusteriTercihleri Tercihler { get; set; } = new();
+
+    public string? TercihEdilenSirketKimligi { get; set; }
+
+    public Dictionary<string, int> HizmetKullanimSayilari
+    {
+        get;
+        set;
+    } = new(StringComparer.OrdinalIgnoreCase);
+
+    public List<MusteriIslemKaydi> IslemGecmisi { get; set; } = [];
+
+    public decimal ToplamHarcama { get; set; }
+
+    public int BasariliIsSayisi { get; set; }
+
+    public int BasarisizIsSayisi { get; set; }
+
+    public bool Aktif { get; set; } = true;
+
+    public DateTimeOffset OlusturulmaZamani { get; set; }
+
+    public DateTimeOffset? SonIslemZamani { get; set; }
+
+    public bool OdemeYapabilirMi(
+        decimal tutar)
+    {
+        return Aktif &&
+               tutar >= 0 &&
+               Bakiye >= tutar;
+    }
+
+    public void OdemeYap(
+        decimal tutar)
+    {
+        if (tutar < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(tutar),
+                "Ödeme tutarı negatif olamaz.");
+        }
+
+        if (Bakiye < tutar)
+        {
+            throw new InvalidOperationException(
+                $"{MusteriAdi} müşterisinin bakiyesi yetersiz.");
+        }
+
+        Bakiye -= tutar;
+        ToplamHarcama += tutar;
+    }
+
+    public void IslemKaydet(
+        MusteriIslemKaydi islem)
+    {
+        ArgumentNullException.ThrowIfNull(islem);
+
+        IslemGecmisi.Add(islem);
+
+        SonIslemZamani =
+            islem.OlusturulmaZamani;
+
+        if (islem.Basarili)
+        {
+            BasariliIsSayisi++;
+        }
+        else
+        {
+            BasarisizIsSayisi++;
+        }
+
+        if (!string.IsNullOrWhiteSpace(
+                islem.HizmetKimligi))
+        {
+            HizmetKullanimSayilari.TryGetValue(
+                islem.HizmetKimligi,
+                out int mevcutKullanim);
+
+            HizmetKullanimSayilari[
+                islem.HizmetKimligi] =
+                mevcutKullanim + 1;
+        }
+
+        const int azamiMusteriGecmisi = 500;
+
+        if (IslemGecmisi.Count >
+            azamiMusteriGecmisi)
+        {
+            int silinecekKayitSayisi =
+                IslemGecmisi.Count -
+                azamiMusteriGecmisi;
+
+            IslemGecmisi.RemoveRange(
+                0,
+                silinecekKayitSayisi);
+        }
+    }
+}

@@ -2,15 +2,24 @@ namespace SirketMotoru.Protokol;
 
 public static class MesajTurleri
 {
-    public const string Merhaba = "merhaba";
+    public const string Merhaba =
+        "merhaba";
 
-    public const string SirketTanitim = "sirketTanitim";
+    public const string SirketTanitim =
+        "sirket_tanitim";
 
-    public const string KayitSonucu = "kayitSonucu";
+    public const string KayitSonucu =
+        "kayit_sonucu";
 
-    public const string SaglikKontrolu = "saglikKontrolu";
+    public const string SaglikKontrolu =
+        "saglik_kontrolu";
 
-    public const string SaglikSonucu = "saglikSonucu";
+    public const string SaglikSonucu =
+        "saglik_sonucu";
 
-    public const string Hata = "hata";
+    public const string IsIstegi =
+        "is_istegi";
+
+    public const string IsSonucu =
+        "is_sonucu";
 }

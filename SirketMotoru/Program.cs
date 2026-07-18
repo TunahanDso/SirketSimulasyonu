@@ -1,15 +1,20 @@
-﻿using System.Text.Json;
+﻿
+using System.Text.Json;
 using SirketMotoru.Ayarlar;
+using SirketMotoru.Hizmetler;
 using SirketMotoru.Kayit;
+using SirketMotoru.Musteriler;
 using SirketMotoru.Sirketler;
 using SirketMotoru.Tick;
 
-Console.OutputEncoding = System.Text.Encoding.UTF8;
+Console.OutputEncoding =
+    System.Text.Encoding.UTF8;
 
 KonsolKayitcisi.Bilgi(
     "Üç Kardeş Yazılım Şirketi Simülasyonu başlatılıyor.");
 
-CancellationTokenSource iptalKaynagi = new();
+using CancellationTokenSource iptalKaynagi =
+    new();
 
 Console.CancelKeyPress += (_, eventArgs) =>
 {
@@ -23,41 +28,131 @@ Console.CancelKeyPress += (_, eventArgs) =>
 
 try
 {
+    JsonSerializerOptions jsonAyarlari =
+        new()
+        {
+            PropertyNameCaseInsensitive =
+                true
+        };
+
     string ayarDosyasiYolu =
-        AyarDosyasiniBul();
+        VeriDosyasiniBul(
+            "motor-ayarlari.json");
+
+    string motorVerileriKlasoru =
+        Path.GetDirectoryName(
+            ayarDosyasiYolu)
+        ?? throw new InvalidOperationException(
+            "MotorVerileri klasörü belirlenemedi.");
 
     KonsolKayitcisi.Bilgi(
-        $"Ayar dosyası bulundu: {ayarDosyasiYolu}");
+        $"Motor veri klasörü: " +
+        $"{motorVerileriKlasoru}");
 
-    string ayarJson =
-        await File.ReadAllTextAsync(
+    KonsolKayitcisi.Bilgi(
+        $"Motor ayar dosyası bulundu: " +
+        $"{ayarDosyasiYolu}");
+
+    MotorAyarlari motorAyarlari =
+        await JsonDosyasiniOkuAsync<MotorAyarlari>(
             ayarDosyasiYolu,
+            jsonAyarlari,
             iptalKaynagi.Token);
 
-    JsonSerializerOptions jsonAyarlari = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-
-    MotorAyarlari? motorAyarlari =
-        JsonSerializer.Deserialize<MotorAyarlari>(
-            ayarJson,
-            jsonAyarlari);
-
-    if (motorAyarlari is null)
-    {
-        throw new InvalidOperationException(
-            "Motor ayarları okunamadı.");
-    }
-
-    AyarlariDogrula(motorAyarlari);
+    MotorAyarlariDogrulayicisi.Dogrula(
+        motorAyarlari);
 
     KonsolKayitcisi.Basari(
         $"Motor ayarları yüklendi. " +
-        $"Şirket sayısı: {motorAyarlari.Sirketler.Count}");
+        $"Şirket sayısı: " +
+        $"{motorAyarlari.Sirketler.Count}");
+
+    string katalogDosyasiYolu =
+        Path.Combine(
+            motorVerileriKlasoru,
+            "hizmet-katalogu.json");
+
+    if (!File.Exists(
+            katalogDosyasiYolu))
+    {
+        katalogDosyasiYolu =
+            VeriDosyasiniBul(
+                "hizmet-katalogu.json");
+    }
+
+    KonsolKayitcisi.Bilgi(
+        $"Hizmet kataloğu bulundu: " +
+        $"{katalogDosyasiYolu}");
+
+    HizmetKatalogAyarlari katalogAyarlari =
+        await JsonDosyasiniOkuAsync<HizmetKatalogAyarlari>(
+            katalogDosyasiYolu,
+            jsonAyarlari,
+            iptalKaynagi.Token);
+
+    HizmetKatalogu hizmetKatalogu =
+        new(
+            katalogAyarlari);
+
+    int aktifHizmetSayisi =
+        hizmetKatalogu.Hizmetler.Count(
+            hizmet => hizmet.Aktif);
+
+    KonsolKayitcisi.Basari(
+        $"Hizmet kataloğu yüklendi. " +
+        $"Katalog sürümü: " +
+        $"{hizmetKatalogu.KatalogSurumu} | " +
+        $"Aktif hizmet sayısı: " +
+        $"{aktifHizmetSayisi}");
+
+    foreach (HizmetTanimi hizmet in
+             hizmetKatalogu.Hizmetler
+                 .Where(
+                     hizmet => hizmet.Aktif)
+                 .OrderBy(
+                     hizmet => hizmet.HizmetKimligi,
+                     StringComparer.OrdinalIgnoreCase))
+    {
+        KonsolKayitcisi.Bilgi(
+            $"Hizmet: " +
+            $"{hizmet.HizmetKimligi}@" +
+            $"{hizmet.HizmetSurumu}");
+    }
+
+    string musteriDosyasiYolu =
+        Path.Combine(
+            motorVerileriKlasoru,
+            "musteriler.json");
+
+    KonsolKayitcisi.Bilgi(
+        $"Müşteri veritabanı yolu: " +
+        $"{musteriDosyasiYolu}");
+
+    MusteriVeritabani musteriVeritabani =
+        new(
+            musteriDosyasiYolu);
+
+    await using MusteriYoneticisi musteriYoneticisi =
+        new(
+            musteriVeritabani,
+            hizmetKatalogu);
+
+    await musteriYoneticisi.BaslatAsync(
+        iptalKaynagi.Token);
+
+    KonsolKayitcisi.Basari(
+        $"Müşteri sistemi hazır. " +
+        $"Toplam müşteri: " +
+        $"{musteriYoneticisi.Musteriler.Count} | " +
+        $"Aktif müşteri: " +
+        $"{musteriYoneticisi.AktifMusteriSayisi} | " +
+        $"Toplam müşteri bakiyesi: " +
+        $"{musteriYoneticisi.ToplamMusteriBakiyesi:N2}");
 
     await using SirketYoneticisi sirketYoneticisi =
-        new(motorAyarlari);
+        new(
+            motorAyarlari,
+            hizmetKatalogu);
 
     await sirketYoneticisi.IlkBaglantilariKurAsync(
         iptalKaynagi.Token);
@@ -65,7 +160,8 @@ try
     TickYoneticisi tickYoneticisi =
         new(
             motorAyarlari,
-            sirketYoneticisi);
+            sirketYoneticisi,
+            musteriYoneticisi);
 
     await tickYoneticisi.BaslatAsync(
         iptalKaynagi.Token);
@@ -75,10 +171,44 @@ catch (OperationCanceledException)
     KonsolKayitcisi.Bilgi(
         "Motor kullanıcı tarafından durduruldu.");
 }
+catch (FileNotFoundException exception)
+{
+    KonsolKayitcisi.Hata(
+        $"Gerekli motor dosyası bulunamadı: " +
+        $"{exception.Message}");
+
+    KonsolKayitcisi.Hata(
+        exception.ToString());
+
+    Environment.ExitCode = 1;
+}
+catch (JsonException exception)
+{
+    KonsolKayitcisi.Hata(
+        $"JSON dosyası okunamadı: " +
+        $"{exception.Message}");
+
+    KonsolKayitcisi.Hata(
+        exception.ToString());
+
+    Environment.ExitCode = 1;
+}
+catch (InvalidOperationException exception)
+{
+    KonsolKayitcisi.Hata(
+        $"Motor yapılandırması veya durumu geçersiz: " +
+        $"{exception.Message}");
+
+    KonsolKayitcisi.Hata(
+        exception.ToString());
+
+    Environment.ExitCode = 1;
+}
 catch (Exception exception)
 {
     KonsolKayitcisi.Hata(
-        $"Motor çalıştırılamadı: {exception.Message}");
+        $"Motor çalıştırılamadı: " +
+        $"{exception.Message}");
 
     KonsolKayitcisi.Hata(
         exception.ToString());
@@ -87,26 +217,102 @@ catch (Exception exception)
 }
 finally
 {
-    iptalKaynagi.Dispose();
-
     KonsolKayitcisi.Bilgi(
         "Motor kapatıldı.");
 }
 
-static string AyarDosyasiniBul()
+static async Task<T> JsonDosyasiniOkuAsync<T>(
+    string dosyaYolu,
+    JsonSerializerOptions jsonAyarlari,
+    CancellationToken cancellationToken)
 {
+    if (string.IsNullOrWhiteSpace(
+            dosyaYolu))
+    {
+        throw new ArgumentException(
+            "JSON dosya yolu boş olamaz.",
+            nameof(dosyaYolu));
+    }
+
+    if (!File.Exists(
+            dosyaYolu))
+    {
+        throw new FileNotFoundException(
+            $"JSON dosyası bulunamadı: " +
+            $"{dosyaYolu}",
+            dosyaYolu);
+    }
+
+    string json =
+        await File.ReadAllTextAsync(
+            dosyaYolu,
+            cancellationToken);
+
+    if (string.IsNullOrWhiteSpace(
+            json))
+    {
+        throw new InvalidOperationException(
+            $"{Path.GetFileName(dosyaYolu)} " +
+            $"dosyası boş.");
+    }
+
+    T? veri =
+        JsonSerializer.Deserialize<T>(
+            json,
+            jsonAyarlari);
+
+    if (veri is null)
+    {
+        throw new InvalidOperationException(
+            $"{Path.GetFileName(dosyaYolu)} " +
+            $"dosyası okunamadı.");
+    }
+
+    return veri;
+}
+
+static string VeriDosyasiniBul(
+    string dosyaAdi)
+{
+    if (string.IsNullOrWhiteSpace(
+            dosyaAdi))
+    {
+        throw new ArgumentException(
+            "Dosya adı boş olamaz.",
+            nameof(dosyaAdi));
+    }
+
     string[] olasiYollar =
     [
         Path.Combine(
             Directory.GetCurrentDirectory(),
             "MotorVerileri",
-            "motor-ayarlari.json"),
+            dosyaAdi),
 
         Path.Combine(
             Directory.GetCurrentDirectory(),
             "..",
             "MotorVerileri",
-            "motor-ayarlari.json"),
+            dosyaAdi),
+
+        Path.Combine(
+            AppContext.BaseDirectory,
+            "MotorVerileri",
+            dosyaAdi),
+
+        Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "MotorVerileri",
+            dosyaAdi),
+
+        Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "MotorVerileri",
+            dosyaAdi),
 
         Path.Combine(
             AppContext.BaseDirectory,
@@ -115,73 +321,35 @@ static string AyarDosyasiniBul()
             "..",
             "..",
             "MotorVerileri",
-            "motor-ayarlari.json")
+            dosyaAdi)
     ];
 
-    foreach (string yol in olasiYollar)
+    foreach (string yol in
+             olasiYollar)
     {
-        string tamYol = Path.GetFullPath(yol);
+        string tamYol =
+            Path.GetFullPath(
+                yol);
 
-        if (File.Exists(tamYol))
+        if (File.Exists(
+                tamYol))
         {
             return tamYol;
         }
     }
 
+    string arananYollar =
+        string.Join(
+            Environment.NewLine,
+            olasiYollar.Select(
+                yol =>
+                    $" - {Path.GetFullPath(yol)}"));
+
     throw new FileNotFoundException(
-        "MotorVerileri/motor-ayarlari.json dosyası bulunamadı.");
-}
-
-static void AyarlariDogrula(
-    MotorAyarlari ayarlar)
-{
-    if (string.IsNullOrWhiteSpace(ayarlar.MotorKimligi))
-    {
-        throw new InvalidOperationException(
-            "Motor kimliği boş olamaz.");
-    }
-
-    if (ayarlar.TickSuresiSaniye < 1)
-    {
-        throw new InvalidOperationException(
-            "Tick süresi en az 1 saniye olmalıdır.");
-    }
-
-    if (ayarlar.Sirketler.Count == 0)
-    {
-        throw new InvalidOperationException(
-            "Motor ayarlarında en az bir şirket bulunmalıdır.");
-    }
-
-    HashSet<string> kimlikler =
-        new(StringComparer.OrdinalIgnoreCase);
-
-    HashSet<int> portlar = [];
-
-    foreach (SirketBaglantiAyari sirket in ayarlar.Sirketler)
-    {
-        if (string.IsNullOrWhiteSpace(sirket.SirketKimligi))
-        {
-            throw new InvalidOperationException(
-                "Şirket kimliği boş olamaz.");
-        }
-
-        if (!kimlikler.Add(sirket.SirketKimligi))
-        {
-            throw new InvalidOperationException(
-                $"Tekrarlanan şirket kimliği: {sirket.SirketKimligi}");
-        }
-
-        if (sirket.Port is < 1 or > 65535)
-        {
-            throw new InvalidOperationException(
-                $"{sirket.SirketAdi} için port geçersiz: {sirket.Port}");
-        }
-
-        if (!portlar.Add(sirket.Port))
-        {
-            throw new InvalidOperationException(
-                $"Aynı port birden fazla şirkette kullanılıyor: {sirket.Port}");
-        }
-    }
+        $"MotorVerileri/{dosyaAdi} " +
+        $"dosyası bulunamadı." +
+        Environment.NewLine +
+        $"Aranan yollar:" +
+        Environment.NewLine +
+        arananYollar);
 }

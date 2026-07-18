@@ -3,31 +3,60 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using SirketMotoru.Ayarlar;
+using SirketMotoru.Isler;
 using SirketMotoru.Kayit;
 using SirketMotoru.Protokol;
+using SirketMotoru.Protokol.Mesajlar;
 using SirketMotoru.Sirketler;
 
 namespace SirketMotoru.Ag;
 
 public sealed class SirketBaglantisi : IAsyncDisposable
 {
-    private static readonly JsonSerializerOptions JsonAyarlari = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = false
-    };
+    private static readonly JsonSerializerOptions JsonAyarlari =
+        new()
+        {
+            PropertyNamingPolicy =
+                JsonNamingPolicy.CamelCase,
+
+            PropertyNameCaseInsensitive =
+                true,
+
+            WriteIndented =
+                false
+        };
 
     private readonly MotorAyarlari _motorAyarlari;
+
     private readonly SirketBaglantiAyari _sirketAyari;
 
+    /*
+     * TCP bağlantısında tek bir okuyucu bulunuyor.
+     *
+     * Sağlık kontrolü ile iş isteği aynı anda gönderilirse,
+     * bir metodun diğer metoda ait cevabı okuma riski oluşur.
+     *
+     * Minimal sürümde her şirket bağlantısında aynı anda
+     * yalnızca bir istek-cevap işlemi yürütüyoruz.
+     */
+    private readonly SemaphoreSlim _istekCevapKilidi =
+        new(1, 1);
+
+    private readonly SemaphoreSlim _baglantiKilidi =
+        new(1, 1);
+
     private TcpClient? _tcpClient;
+
     private StreamReader? _okuyucu;
+
     private StreamWriter? _yazici;
+
+    private bool _disposed;
 
     public SirketKaydi Kayit { get; }
 
     public bool Bagli =>
+        !_disposed &&
         _tcpClient is not null &&
         _tcpClient.Connected &&
         _okuyucu is not null &&
@@ -37,117 +66,230 @@ public sealed class SirketBaglantisi : IAsyncDisposable
         MotorAyarlari motorAyarlari,
         SirketBaglantiAyari sirketAyari)
     {
-        _motorAyarlari = motorAyarlari;
-        _sirketAyari = sirketAyari;
+        ArgumentNullException.ThrowIfNull(
+            motorAyarlari);
 
-        Kayit = new SirketKaydi
+        ArgumentNullException.ThrowIfNull(
+            sirketAyari);
+
+        if (string.IsNullOrWhiteSpace(
+                sirketAyari.SirketKimligi))
         {
-            SirketKimligi = sirketAyari.SirketKimligi,
-            SirketAdi = sirketAyari.SirketAdi,
-            Durum = SirketDurumu.BagliDegil
-        };
+            throw new ArgumentException(
+                "Şirket kimliği boş olamaz.",
+                nameof(sirketAyari));
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                sirketAyari.SirketAdi))
+        {
+            throw new ArgumentException(
+                "Şirket adı boş olamaz.",
+                nameof(sirketAyari));
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                sirketAyari.Adres))
+        {
+            throw new ArgumentException(
+                "Şirket sunucu adresi boş olamaz.",
+                nameof(sirketAyari));
+        }
+
+        if (sirketAyari.Port is <= 0 or > 65_535)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(sirketAyari),
+                "Şirket portu 1-65535 arasında olmalıdır.");
+        }
+
+        _motorAyarlari =
+            motorAyarlari;
+
+        _sirketAyari =
+            sirketAyari;
+
+        Kayit =
+            new SirketKaydi
+            {
+                SirketKimligi =
+                    sirketAyari.SirketKimligi,
+
+                SirketAdi =
+                    sirketAyari.SirketAdi,
+
+                Durum =
+                    SirketDurumu.BagliDegil
+            };
     }
 
     public async Task<bool> BaglanVeKaydetAsync(
         CancellationToken cancellationToken)
     {
-        await BaglantiyiKapatAsync();
+        DisposeEdilmediginiDogrula();
 
-        Kayit.Durum = SirketDurumu.Baglaniyor;
+        await _baglantiKilidi.WaitAsync(
+            cancellationToken);
 
         try
         {
-            KonsolKayitcisi.Bilgi(
-                $"{_sirketAyari.SirketAdi} sunucusuna bağlanılıyor: " +
-                $"{_sirketAyari.Adres}:{_sirketAyari.Port}");
+            await BaglantiyiKapatIcAsync();
 
-            _tcpClient = new TcpClient
+            Kayit.Durum =
+                SirketDurumu.Baglaniyor;
+
+            try
             {
-                NoDelay = true
-            };
+                KonsolKayitcisi.Bilgi(
+                    $"{_sirketAyari.SirketAdi} " +
+                    $"sunucusuna bağlanılıyor: " +
+                    $"{_sirketAyari.Adres}:" +
+                    $"{_sirketAyari.Port}");
 
-            using CancellationTokenSource zamanAsimi =
-                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                _tcpClient =
+                    new TcpClient
+                    {
+                        NoDelay = true
+                    };
 
-            zamanAsimi.CancelAfter(
-                TimeSpan.FromMilliseconds(
-                    _motorAyarlari.BaglantiZamanAsimiMs));
+                using CancellationTokenSource zamanAsimi =
+                    CancellationTokenSource
+                        .CreateLinkedTokenSource(
+                            cancellationToken);
 
-            await _tcpClient.ConnectAsync(
-                _sirketAyari.Adres,
-                _sirketAyari.Port,
-                zamanAsimi.Token);
+                zamanAsimi.CancelAfter(
+                    TimeSpan.FromMilliseconds(
+                        _motorAyarlari
+                            .BaglantiZamanAsimiMs));
 
-            NetworkStream agAkisi = _tcpClient.GetStream();
+                await _tcpClient.ConnectAsync(
+                    _sirketAyari.Adres,
+                    _sirketAyari.Port,
+                    zamanAsimi.Token);
 
-            _okuyucu = new StreamReader(
-                agAkisi,
-                new UTF8Encoding(false),
-                detectEncodingFromByteOrderMarks: false,
-                bufferSize: 4096,
-                leaveOpen: true);
+                NetworkStream agAkisi =
+                    _tcpClient.GetStream();
 
-            _yazici = new StreamWriter(
-                agAkisi,
-                new UTF8Encoding(false),
-                bufferSize: 4096,
-                leaveOpen: true)
-            {
-                AutoFlush = true,
-                NewLine = "\n"
-            };
+                _okuyucu =
+                    new StreamReader(
+                        agAkisi,
+                        new UTF8Encoding(
+                            encoderShouldEmitUTF8Identifier:
+                                false),
+                        detectEncodingFromByteOrderMarks:
+                            false,
+                        bufferSize:
+                            4096,
+                        leaveOpen:
+                            true);
 
-            await MerhabaGonderAsync(cancellationToken);
+                _yazici =
+                    new StreamWriter(
+                        agAkisi,
+                        new UTF8Encoding(
+                            encoderShouldEmitUTF8Identifier:
+                                false),
+                        bufferSize:
+                            4096,
+                        leaveOpen:
+                            true)
+                    {
+                        AutoFlush =
+                            true,
 
-            SirketTanitimMesaji tanitim =
-                await SirketTanitiminiOkuAsync(cancellationToken);
+                        NewLine =
+                            "\n"
+                    };
 
-            if (tanitim.SirketKimligi != _sirketAyari.SirketKimligi)
-            {
-                throw new InvalidOperationException(
-                    $"Şirket kimliği uyuşmuyor. " +
-                    $"Beklenen: {_sirketAyari.SirketKimligi}, " +
-                    $"gelen: {tanitim.SirketKimligi}");
+                await _istekCevapKilidi.WaitAsync(
+                    cancellationToken);
+
+                try
+                {
+                    await MerhabaGonderAsync(
+                        cancellationToken);
+
+                    SirketTanitimMesaji tanitim =
+                        await SirketTanitiminiOkuAsync(
+                            cancellationToken);
+
+                    SirketTanitiminiDogrula(
+                        tanitim);
+
+                    SirketKaydiniGuncelle(
+                        tanitim);
+
+                    await KayitSonucuGonderAsync(
+                        basarili:
+                            true,
+                        aciklama:
+                            "Şirket motor tarafından " +
+                            "başarıyla kaydedildi.",
+                        cancellationToken);
+                }
+                finally
+                {
+                    _istekCevapKilidi.Release();
+                }
+
+                Kayit.Durum =
+                    SirketDurumu.Bagli;
+
+                string hizmetMetni =
+                    Kayit.Hizmetler.Count == 0
+                        ? "Henüz hizmet bildirilmedi"
+                        : string.Join(
+                            ", ",
+                            Kayit.Hizmetler.Select(
+                                hizmet =>
+                                    $"{hizmet.HizmetKimligi}@" +
+                                    $"{hizmet.HizmetSurumu}"));
+
+                KonsolKayitcisi.Basari(
+                    $"{Kayit.SirketAdi} motora bağlandı. " +
+                    $"Sunucu sürümü: " +
+                    $"{Kayit.SunucuSurumu} | " +
+                    $"Hizmetler: {hizmetMetni}");
+
+                return true;
             }
+            catch (OperationCanceledException)
+                when (!cancellationToken
+                    .IsCancellationRequested)
+            {
+                Kayit.Durum =
+                    SirketDurumu.CevapVermiyor;
 
-            Kayit.SirketKimligi = tanitim.SirketKimligi;
-            Kayit.SirketAdi = tanitim.SirketAdi;
-            Kayit.SunucuSurumu = tanitim.SunucuSurumu;
-            Kayit.Durum = SirketDurumu.Bagli;
+                Kayit.BasarisizKontrolSayisi++;
 
-            await KayitSonucuGonderAsync(
-                basarili: true,
-                aciklama: "Şirket motor tarafından başarıyla kaydedildi.",
-                cancellationToken);
+                KonsolKayitcisi.Uyari(
+                    $"{_sirketAyari.SirketAdi} " +
+                    $"bağlantı zaman aşımına uğradı.");
 
-            KonsolKayitcisi.Basari(
-                $"{Kayit.SirketAdi} motora bağlandı. " +
-                $"Sunucu sürümü: {Kayit.SunucuSurumu}");
+                await BaglantiyiKapatIcAsync();
 
-            return true;
+                return false;
+            }
+            catch (Exception exception)
+            {
+                Kayit.Durum =
+                    SirketDurumu.Hatali;
+
+                Kayit.BasarisizKontrolSayisi++;
+
+                KonsolKayitcisi.Uyari(
+                    $"{_sirketAyari.SirketAdi} " +
+                    $"bağlanamadı: " +
+                    $"{exception.Message}");
+
+                await BaglantiyiKapatIcAsync();
+
+                return false;
+            }
         }
-        catch (OperationCanceledException)
-            when (!cancellationToken.IsCancellationRequested)
+        finally
         {
-            Kayit.Durum = SirketDurumu.CevapVermiyor;
-            Kayit.BasarisizKontrolSayisi++;
-
-            KonsolKayitcisi.Uyari(
-                $"{_sirketAyari.SirketAdi} bağlantı zaman aşımına uğradı.");
-
-            await BaglantiyiKapatAsync();
-            return false;
-        }
-        catch (Exception exception)
-        {
-            Kayit.Durum = SirketDurumu.Hatali;
-            Kayit.BasarisizKontrolSayisi++;
-
-            KonsolKayitcisi.Uyari(
-                $"{_sirketAyari.SirketAdi} bağlanamadı: {exception.Message}");
-
-            await BaglantiyiKapatAsync();
-            return false;
+            _baglantiKilidi.Release();
         }
     }
 
@@ -155,126 +297,377 @@ public sealed class SirketBaglantisi : IAsyncDisposable
         long tickNumarasi,
         CancellationToken cancellationToken)
     {
+        DisposeEdilmediginiDogrula();
+
         if (!Bagli)
         {
             return false;
         }
 
-        string istekKimligi =
-            $"saglik-{tickNumarasi}-{Guid.NewGuid():N}";
-
-        SaglikKontroluMesaji mesaj = new()
-        {
-            MesajTuru = MesajTurleri.SaglikKontrolu,
-            MesajKimligi = YeniMesajKimligi(),
-            ProtokolSurumu = _motorAyarlari.ProtokolSurumu,
-            IstekKimligi = istekKimligi,
-            TickNumarasi = tickNumarasi
-        };
-
-        Stopwatch kronometre = Stopwatch.StartNew();
+        await _istekCevapKilidi.WaitAsync(
+            cancellationToken);
 
         try
         {
-            await MesajGonderAsync(mesaj, cancellationToken);
+            if (!Bagli)
+            {
+                return false;
+            }
+
+            string istekKimligi =
+                $"saglik-{tickNumarasi}-" +
+                $"{Guid.NewGuid():N}";
+
+            SaglikKontroluMesaji mesaj =
+                new()
+                {
+                    MesajTuru =
+                        MesajTurleri.SaglikKontrolu,
+
+                    MesajKimligi =
+                        YeniMesajKimligi(),
+
+                    ProtokolSurumu =
+                        _motorAyarlari
+                            .ProtokolSurumu,
+
+                    IstekKimligi =
+                        istekKimligi,
+
+                    TickNumarasi =
+                        tickNumarasi
+                };
+
+            Stopwatch kronometre =
+                Stopwatch.StartNew();
+
+            try
+            {
+                await MesajGonderAsync(
+                    mesaj,
+                    cancellationToken);
+
+                string cevapSatiri =
+                    await MesajOkuAsync(
+                        _motorAyarlari
+                            .MesajZamanAsimiMs,
+                        cancellationToken);
+
+                kronometre.Stop();
+
+                SaglikSonucuMesaji? cevap =
+                    JsonSerializer
+                        .Deserialize<SaglikSonucuMesaji>(
+                            cevapSatiri,
+                            JsonAyarlari);
+
+                if (cevap is null)
+                {
+                    throw new InvalidOperationException(
+                        "Sağlık cevabı ayrıştırılamadı.");
+                }
+
+                if (!string.Equals(
+                        cevap.MesajTuru,
+                        MesajTurleri.SaglikSonucu,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"Beklenmeyen mesaj türü: " +
+                        $"{cevap.MesajTuru}");
+                }
+
+                if (!string.Equals(
+                        cevap.IstekKimligi,
+                        istekKimligi,
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        "Sağlık cevabındaki istek " +
+                        "kimliği uyuşmuyor.");
+                }
+
+                Kayit.Durum =
+                    SirketDurumu.Calisiyor;
+
+                Kayit.SonGecikmeMs =
+                    kronometre
+                        .Elapsed
+                        .TotalMilliseconds;
+
+                Kayit.SonCevapZamani =
+                    DateTimeOffset.UtcNow;
+
+                Kayit.BasariliKontrolSayisi++;
+
+                Kayit.AktifBaglantiSayisi =
+                    Math.Max(
+                        0,
+                        cevap.AktifBaglanti);
+
+                Kayit.KuyrukUzunlugu =
+                    Math.Max(
+                        0,
+                        cevap.KuyrukUzunlugu);
+
+                KonsolKayitcisi.Basari(
+                    $"{Kayit.SirketAdi,-16} | " +
+                    $"ÇALIŞIYOR | " +
+                    $"{Kayit.SonGecikmeMs,8:F2} ms | " +
+                    $"Bağlantı: " +
+                    $"{Kayit.AktifBaglantiSayisi} | " +
+                    $"Kuyruk: " +
+                    $"{Kayit.KuyrukUzunlugu}");
+
+                return true;
+            }
+            catch (OperationCanceledException)
+                when (!cancellationToken
+                    .IsCancellationRequested)
+            {
+                kronometre.Stop();
+
+                Kayit.Durum =
+                    SirketDurumu.CevapVermiyor;
+
+                Kayit.BasarisizKontrolSayisi++;
+
+                KonsolKayitcisi.Uyari(
+                    $"{Kayit.SirketAdi} sağlık kontrolüne " +
+                    $"zamanında cevap vermedi.");
+
+                await BaglantiyiKapatGuvenliAsync();
+
+                return false;
+            }
+            catch (Exception exception)
+            {
+                kronometre.Stop();
+
+                Kayit.Durum =
+                    SirketDurumu.Hatali;
+
+                Kayit.BasarisizKontrolSayisi++;
+
+                KonsolKayitcisi.Uyari(
+                    $"{Kayit.SirketAdi} sağlık kontrolü " +
+                    $"başarısız: {exception.Message}");
+
+                await BaglantiyiKapatGuvenliAsync();
+
+                return false;
+            }
+        }
+        finally
+        {
+            _istekCevapKilidi.Release();
+        }
+    }
+
+    public async Task<IsSonucuMesaji>
+        IsIstegiGonderVeSonucuBekleAsync(
+            IsIstegiMesaji isIstegi,
+            CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(
+            isIstegi);
+
+        DisposeEdilmediginiDogrula();
+
+        isIstegi.Dogrula();
+
+        if (!Bagli)
+        {
+            throw new InvalidOperationException(
+                $"{Kayit.SirketAdi} bağlantısı açık değil.");
+        }
+
+        if (!string.Equals(
+                Kayit.SirketKimligi,
+                _sirketAyari.SirketKimligi,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Bağlantıdaki şirket kimliği geçersiz.");
+        }
+
+        await _istekCevapKilidi.WaitAsync(
+            cancellationToken);
+
+        Stopwatch kronometre =
+            Stopwatch.StartNew();
+
+        try
+        {
+            if (!Bagli)
+            {
+                throw new InvalidOperationException(
+                    $"{Kayit.SirketAdi} bağlantısı kapandı.");
+            }
+
+            KonsolKayitcisi.Bilgi(
+                $"İş gönderiliyor | " +
+                $"Şirket: {Kayit.SirketAdi} | " +
+                $"İş: {isIstegi.IsKimligi} | " +
+                $"Hizmet: " +
+                $"{isIstegi.HizmetKimligi}@" +
+                $"{isIstegi.HizmetSurumu} | " +
+                $"Tutar: " +
+                $"{isIstegi.TeklifEdilenTutar:N2}");
+
+            await MesajGonderAsync(
+                isIstegi,
+                cancellationToken);
 
             string cevapSatiri =
-                await MesajOkuAsync(cancellationToken);
+                await MesajOkuAsync(
+                    isIstegi.ZamanAsimiMs,
+                    cancellationToken);
 
             kronometre.Stop();
 
-            SaglikSonucuMesaji? cevap =
-                JsonSerializer.Deserialize<SaglikSonucuMesaji>(
-                    cevapSatiri,
-                    JsonAyarlari);
+            IsSonucuMesaji? sonuc =
+                JsonSerializer
+                    .Deserialize<IsSonucuMesaji>(
+                        cevapSatiri,
+                        JsonAyarlari);
 
-            if (cevap is null)
+            if (sonuc is null)
             {
                 throw new InvalidOperationException(
-                    "Sağlık cevabı ayrıştırılamadı.");
+                    "Şirket iş sonucu ayrıştırılamadı.");
             }
 
-            if (cevap.MesajTuru != MesajTurleri.SaglikSonucu)
+            sonuc.Dogrula();
+
+            IsSonucuMesajiniDogrula(
+                isIstegi,
+                sonuc);
+
+            Kayit.SonCevapZamani =
+                DateTimeOffset.UtcNow;
+
+            Kayit.SonGecikmeMs =
+                kronometre
+                    .Elapsed
+                    .TotalMilliseconds;
+
+            if (Kayit.Durum ==
+                SirketDurumu.Bagli)
             {
-                throw new InvalidOperationException(
-                    $"Beklenmeyen mesaj türü: {cevap.MesajTuru}");
+                Kayit.Durum =
+                    SirketDurumu.Calisiyor;
             }
 
-            if (cevap.IstekKimligi != istekKimligi)
-            {
-                throw new InvalidOperationException(
-                    "Sağlık cevabındaki istek kimliği uyuşmuyor.");
-            }
+            KonsolKayitcisi.Bilgi(
+                $"İş cevabı alındı | " +
+                $"Şirket: {Kayit.SirketAdi} | " +
+                $"İş: {isIstegi.IsKimligi} | " +
+                $"Başarılı bildirimi: " +
+                $"{sonuc.Basarili} | " +
+                $"Gerçek ağ süresi: " +
+                $"{kronometre.Elapsed.TotalMilliseconds:N2} ms | " +
+                $"Şirketin bildirdiği süre: " +
+                $"{sonuc.IslemSuresiMs:N2} ms");
 
-            Kayit.Durum = SirketDurumu.Calisiyor;
-            Kayit.SonGecikmeMs = kronometre.Elapsed.TotalMilliseconds;
-            Kayit.SonCevapZamani = DateTimeOffset.Now;
-            Kayit.BasariliKontrolSayisi++;
-            Kayit.AktifBaglantiSayisi = cevap.AktifBaglanti;
-            Kayit.KuyrukUzunlugu = cevap.KuyrukUzunlugu;
-
-            KonsolKayitcisi.Basari(
-                $"{Kayit.SirketAdi,-16} | ÇALIŞIYOR | " +
-                $"{Kayit.SonGecikmeMs,8:F2} ms | " +
-                $"Bağlantı: {Kayit.AktifBaglantiSayisi} | " +
-                $"Kuyruk: {Kayit.KuyrukUzunlugu}");
-
-            return true;
+            return sonuc;
         }
         catch (OperationCanceledException)
             when (!cancellationToken.IsCancellationRequested)
         {
             kronometre.Stop();
 
-            Kayit.Durum = SirketDurumu.CevapVermiyor;
+            Kayit.Durum =
+                SirketDurumu.CevapVermiyor;
+
             Kayit.BasarisizKontrolSayisi++;
 
             KonsolKayitcisi.Uyari(
-                $"{Kayit.SirketAdi} sağlık kontrolüne zamanında cevap vermedi.");
+                $"İş zaman aşımına uğradı | " +
+                $"Şirket: {Kayit.SirketAdi} | " +
+                $"İş: {isIstegi.IsKimligi} | " +
+                $"Sınır: {isIstegi.ZamanAsimiMs} ms");
 
-            await BaglantiyiKapatAsync();
-            return false;
+            /*
+             * Zaman aşımından sonra bağlantıyı kapatıyoruz.
+             *
+             * Çünkü şirket geç kalan sonucu daha sonra gönderirse,
+             * aynı TCP akışındaki sonraki isteğin cevabı sanılabilir.
+             */
+            await BaglantiyiKapatGuvenliAsync();
+
+            throw new TimeoutException(
+                $"{Kayit.SirketAdi}, " +
+                $"{isIstegi.IsKimligi} işine " +
+                $"{isIstegi.ZamanAsimiMs} ms içinde " +
+                "cevap vermedi.");
         }
-        catch (Exception exception)
+        catch
         {
             kronometre.Stop();
 
-            Kayit.Durum = SirketDurumu.Hatali;
-            Kayit.BasarisizKontrolSayisi++;
+            throw;
+        }
+        finally
+        {
+            _istekCevapKilidi.Release();
+        }
+    }
 
-            KonsolKayitcisi.Uyari(
-                $"{Kayit.SirketAdi} sağlık kontrolü başarısız: " +
-                exception.Message);
+    public async Task BaglantiyiKapatAsync()
+    {
+        await _baglantiKilidi.WaitAsync();
 
-            await BaglantiyiKapatAsync();
-            return false;
+        try
+        {
+            await BaglantiyiKapatIcAsync();
+        }
+        finally
+        {
+            _baglantiKilidi.Release();
         }
     }
 
     private async Task MerhabaGonderAsync(
         CancellationToken cancellationToken)
     {
-        MerhabaMesaji mesaj = new()
-        {
-            MesajTuru = MesajTurleri.Merhaba,
-            MesajKimligi = YeniMesajKimligi(),
-            ProtokolSurumu = _motorAyarlari.ProtokolSurumu,
-            MotorKimligi = _motorAyarlari.MotorKimligi
-        };
+        MerhabaMesaji mesaj =
+            new()
+            {
+                MesajTuru =
+                    MesajTurleri.Merhaba,
 
-        await MesajGonderAsync(mesaj, cancellationToken);
+                MesajKimligi =
+                    YeniMesajKimligi(),
+
+                ProtokolSurumu =
+                    _motorAyarlari
+                        .ProtokolSurumu,
+
+                MotorKimligi =
+                    _motorAyarlari
+                        .MotorKimligi
+            };
+
+        await MesajGonderAsync(
+            mesaj,
+            cancellationToken);
     }
 
-    private async Task<SirketTanitimMesaji> SirketTanitiminiOkuAsync(
-        CancellationToken cancellationToken)
+    private async Task<SirketTanitimMesaji>
+        SirketTanitiminiOkuAsync(
+            CancellationToken cancellationToken)
     {
         string mesajSatiri =
-            await MesajOkuAsync(cancellationToken);
+            await MesajOkuAsync(
+                _motorAyarlari.MesajZamanAsimiMs,
+                cancellationToken);
 
         SirketTanitimMesaji? tanitim =
-            JsonSerializer.Deserialize<SirketTanitimMesaji>(
-                mesajSatiri,
-                JsonAyarlari);
+            JsonSerializer
+                .Deserialize<SirketTanitimMesaji>(
+                    mesajSatiri,
+                    JsonAyarlari);
 
         if (tanitim is null)
         {
@@ -282,14 +675,18 @@ public sealed class SirketBaglantisi : IAsyncDisposable
                 "Şirket tanıtım mesajı okunamadı.");
         }
 
-        if (tanitim.MesajTuru != MesajTurleri.SirketTanitim)
+        if (!string.Equals(
+                tanitim.MesajTuru,
+                MesajTurleri.SirketTanitim,
+                StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
                 $"Şirket tanıtımı beklenirken " +
                 $"{tanitim.MesajTuru} mesajı geldi.");
         }
 
-        if (string.IsNullOrWhiteSpace(tanitim.SirketKimligi))
+        if (string.IsNullOrWhiteSpace(
+                tanitim.SirketKimligi))
         {
             throw new InvalidOperationException(
                 "Şirket kimliği boş olamaz.");
@@ -298,22 +695,91 @@ public sealed class SirketBaglantisi : IAsyncDisposable
         return tanitim;
     }
 
+    private void SirketTanitiminiDogrula(
+        SirketTanitimMesaji tanitim)
+    {
+        if (!string.Equals(
+                tanitim.SirketKimligi,
+                _sirketAyari.SirketKimligi,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Şirket kimliği uyuşmuyor. " +
+                $"Beklenen: " +
+                $"{_sirketAyari.SirketKimligi}, " +
+                $"gelen: {tanitim.SirketKimligi}");
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                tanitim.SirketAdi))
+        {
+            throw new InvalidOperationException(
+                "Şirket adı boş olamaz.");
+        }
+
+        if (tanitim.Hizmetler is null)
+        {
+            throw new InvalidOperationException(
+                "Şirket hizmet listesi göndermedi.");
+        }
+    }
+
+    private void SirketKaydiniGuncelle(
+        SirketTanitimMesaji tanitim)
+    {
+        Kayit.SirketKimligi =
+            tanitim.SirketKimligi.Trim();
+
+        Kayit.SirketAdi =
+            tanitim.SirketAdi.Trim();
+
+        Kayit.SunucuSurumu =
+            tanitim.SunucuSurumu?.Trim() ??
+            string.Empty;
+
+        Kayit.Hizmetler =
+            HizmetleriTemizle(
+                tanitim.Hizmetler);
+
+        Kayit.Durum =
+            SirketDurumu.Bagli;
+
+        Kayit.SonCevapZamani =
+            DateTimeOffset.UtcNow;
+    }
+
     private async Task KayitSonucuGonderAsync(
         bool basarili,
         string aciklama,
         CancellationToken cancellationToken)
     {
-        KayitSonucuMesaji mesaj = new()
-        {
-            MesajTuru = MesajTurleri.KayitSonucu,
-            MesajKimligi = YeniMesajKimligi(),
-            ProtokolSurumu = _motorAyarlari.ProtokolSurumu,
-            Basarili = basarili,
-            SirketKimligi = _sirketAyari.SirketKimligi,
-            Aciklama = aciklama
-        };
+        KayitSonucuMesaji mesaj =
+            new()
+            {
+                MesajTuru =
+                    MesajTurleri.KayitSonucu,
 
-        await MesajGonderAsync(mesaj, cancellationToken);
+                MesajKimligi =
+                    YeniMesajKimligi(),
+
+                ProtokolSurumu =
+                    _motorAyarlari
+                        .ProtokolSurumu,
+
+                Basarili =
+                    basarili,
+
+                SirketKimligi =
+                    _sirketAyari
+                        .SirketKimligi,
+
+                Aciklama =
+                    aciklama
+            };
+
+        await MesajGonderAsync(
+            mesaj,
+            cancellationToken);
     }
 
     private async Task MesajGonderAsync<T>(
@@ -327,24 +793,35 @@ public sealed class SirketBaglantisi : IAsyncDisposable
         }
 
         string json =
-            JsonSerializer.Serialize(mesaj, JsonAyarlari);
+            JsonSerializer.Serialize(
+                mesaj,
+                JsonAyarlari);
 
         int mesajBoyutu =
-            Encoding.UTF8.GetByteCount(json);
+            Encoding.UTF8.GetByteCount(
+                json);
 
-        if (mesajBoyutu > _motorAyarlari.AzamiMesajBoyutuByte)
+        if (mesajBoyutu >
+            _motorAyarlari.AzamiMesajBoyutuByte)
         {
             throw new InvalidOperationException(
-                $"Mesaj boyutu sınırı aşıldı: {mesajBoyutu} byte.");
+                $"Mesaj boyutu sınırı aşıldı: " +
+                $"{mesajBoyutu} byte.");
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
+        cancellationToken
+            .ThrowIfCancellationRequested();
 
-        await _yazici.WriteLineAsync(json);
-        await _yazici.FlushAsync(cancellationToken);
+        await _yazici.WriteLineAsync(
+            json.AsMemory(),
+            cancellationToken);
+
+        await _yazici.FlushAsync(
+            cancellationToken);
     }
 
     private async Task<string> MesajOkuAsync(
+        int zamanAsimiMs,
         CancellationToken cancellationToken)
     {
         if (_okuyucu is null)
@@ -353,15 +830,25 @@ public sealed class SirketBaglantisi : IAsyncDisposable
                 "Şirket bağlantısı açık değil.");
         }
 
+        if (zamanAsimiMs <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(zamanAsimiMs),
+                "Mesaj zaman aşımı sıfırdan büyük olmalıdır.");
+        }
+
         using CancellationTokenSource zamanAsimi =
-            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            CancellationTokenSource
+                .CreateLinkedTokenSource(
+                    cancellationToken);
 
         zamanAsimi.CancelAfter(
             TimeSpan.FromMilliseconds(
-                _motorAyarlari.MesajZamanAsimiMs));
+                zamanAsimiMs));
 
         string? satir =
-            await _okuyucu.ReadLineAsync(zamanAsimi.Token);
+            await _okuyucu.ReadLineAsync(
+                zamanAsimi.Token);
 
         if (satir is null)
         {
@@ -370,15 +857,19 @@ public sealed class SirketBaglantisi : IAsyncDisposable
         }
 
         int mesajBoyutu =
-            Encoding.UTF8.GetByteCount(satir);
+            Encoding.UTF8.GetByteCount(
+                satir);
 
-        if (mesajBoyutu > _motorAyarlari.AzamiMesajBoyutuByte)
+        if (mesajBoyutu >
+            _motorAyarlari.AzamiMesajBoyutuByte)
         {
             throw new InvalidOperationException(
-                $"Gelen mesaj çok büyük: {mesajBoyutu} byte.");
+                $"Gelen mesaj çok büyük: " +
+                $"{mesajBoyutu} byte.");
         }
 
-        if (string.IsNullOrWhiteSpace(satir))
+        if (string.IsNullOrWhiteSpace(
+                satir))
         {
             throw new InvalidOperationException(
                 "Şirket boş mesaj gönderdi.");
@@ -387,12 +878,166 @@ public sealed class SirketBaglantisi : IAsyncDisposable
         return satir;
     }
 
-    private static string YeniMesajKimligi()
+    private void IsSonucuMesajiniDogrula(
+        IsIstegiMesaji istek,
+        IsSonucuMesaji sonuc)
     {
-        return $"mesaj-{Guid.NewGuid():N}";
+        if (!string.Equals(
+                sonuc.MesajTuru,
+                MesajTurleri.IsSonucu,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"İş sonucu beklenirken " +
+                $"{sonuc.MesajTuru} mesajı geldi.");
+        }
+
+        if (!string.Equals(
+                sonuc.IstekKimligi,
+                istek.IstekKimligi,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"İş sonucunun istek kimliği uyuşmuyor. " +
+                $"Beklenen: {istek.IstekKimligi} | " +
+                $"Gelen: {sonuc.IstekKimligi}");
+        }
+
+        if (!string.Equals(
+                sonuc.IsKimligi,
+                istek.IsKimligi,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"İş sonucunun iş kimliği uyuşmuyor. " +
+                $"Beklenen: {istek.IsKimligi} | " +
+                $"Gelen: {sonuc.IsKimligi}");
+        }
+
+        if (!string.Equals(
+                sonuc.SirketKimligi,
+                Kayit.SirketKimligi,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"İş sonucunun şirket kimliği uyuşmuyor. " +
+                $"Beklenen: {Kayit.SirketKimligi} | " +
+                $"Gelen: {sonuc.SirketKimligi}");
+        }
     }
 
-    private async Task BaglantiyiKapatAsync()
+    private static List<SunulanHizmet> HizmetleriTemizle(
+        IEnumerable<SunulanHizmet>? hizmetler)
+    {
+        if (hizmetler is null)
+        {
+            return [];
+        }
+
+        Dictionary<string, SunulanHizmet> temizHizmetler =
+            new(
+                StringComparer.OrdinalIgnoreCase);
+
+        foreach (SunulanHizmet hizmet in
+                 hizmetler)
+        {
+            if (hizmet is null)
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    hizmet.HizmetKimligi) ||
+                string.IsNullOrWhiteSpace(
+                    hizmet.HizmetSurumu))
+            {
+                continue;
+            }
+
+            string hizmetKimligi =
+                hizmet.HizmetKimligi.Trim();
+
+            string hizmetSurumu =
+                hizmet.HizmetSurumu.Trim();
+
+            string anahtar =
+                $"{hizmetKimligi}@{hizmetSurumu}";
+
+            /*
+             * Geçersiz fiyat ve kapasite bildiren hizmetler
+             * şirket kaydına alınmaz.
+             */
+            if (hizmet.BirimFiyat <= 0 ||
+                hizmet.AzamiEszamanliIs <= 0)
+            {
+                continue;
+            }
+
+            temizHizmetler[anahtar] =
+                new SunulanHizmet
+                {
+                    HizmetKimligi =
+                        hizmetKimligi,
+
+                    HizmetSurumu =
+                        hizmetSurumu,
+
+                    BirimFiyat =
+                        decimal.Round(
+                            hizmet.BirimFiyat,
+                            2),
+
+                    AzamiEszamanliIs =
+                        hizmet.AzamiEszamanliIs,
+
+                    Aktif =
+                        hizmet.Aktif
+                };
+        }
+
+        return temizHizmetler
+            .Values
+            .OrderBy(
+                hizmet => hizmet.HizmetKimligi,
+                StringComparer.OrdinalIgnoreCase)
+            .ThenBy(
+                hizmet => hizmet.HizmetSurumu,
+                StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string YeniMesajKimligi()
+    {
+        return
+            $"mesaj-{Guid.NewGuid():N}";
+    }
+
+    private void DisposeEdilmediginiDogrula()
+    {
+        ObjectDisposedException.ThrowIf(
+            _disposed,
+            this);
+    }
+
+    /*
+     * İstek-cevap kilidi tutulurken çağrılabilir.
+     * Bu nedenle tekrar istek-cevap kilidi almaya çalışmaz.
+     */
+    private async Task BaglantiyiKapatGuvenliAsync()
+    {
+        await _baglantiKilidi.WaitAsync();
+
+        try
+        {
+            await BaglantiyiKapatIcAsync();
+        }
+        finally
+        {
+            _baglantiKilidi.Release();
+        }
+    }
+
+    private async Task BaglantiyiKapatIcAsync()
     {
         try
         {
@@ -403,7 +1048,7 @@ public sealed class SirketBaglantisi : IAsyncDisposable
         }
         catch
         {
-            // Kapatma hataları ilk sürümde yok sayılıyor.
+            // Kapatma sırasında yazıcı hatası yok sayılır.
         }
 
         try
@@ -412,7 +1057,7 @@ public sealed class SirketBaglantisi : IAsyncDisposable
         }
         catch
         {
-            // Kapatma hataları ilk sürümde yok sayılıyor.
+            // Kapatma sırasında okuyucu hatası yok sayılır.
         }
 
         try
@@ -421,21 +1066,51 @@ public sealed class SirketBaglantisi : IAsyncDisposable
         }
         catch
         {
-            // Kapatma hataları ilk sürümde yok sayılıyor.
+            // Kapatma sırasında TCP hatası yok sayılır.
         }
 
-        _yazici = null;
-        _okuyucu = null;
-        _tcpClient = null;
+        _yazici =
+            null;
 
-        if (Kayit.Durum is SirketDurumu.Bagli or SirketDurumu.Calisiyor)
+        _okuyucu =
+            null;
+
+        _tcpClient =
+            null;
+
+        if (Kayit.Durum is
+            SirketDurumu.Bagli or
+            SirketDurumu.Calisiyor or
+            SirketDurumu.Baglaniyor)
         {
-            Kayit.Durum = SirketDurumu.BagliDegil;
+            Kayit.Durum =
+                SirketDurumu.BagliDegil;
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        await BaglantiyiKapatAsync();
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed =
+            true;
+
+        await _baglantiKilidi.WaitAsync();
+
+        try
+        {
+            await BaglantiyiKapatIcAsync();
+        }
+        finally
+        {
+            _baglantiKilidi.Release();
+
+            _istekCevapKilidi.Dispose();
+
+            _baglantiKilidi.Dispose();
+        }
     }
 }
