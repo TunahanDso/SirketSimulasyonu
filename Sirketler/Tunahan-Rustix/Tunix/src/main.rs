@@ -9,9 +9,12 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use protocol::{
     IsIstegiMesaji, IsSonucuMesaji, KayitSonucuMesaji, MATEMATIK_CARP,
-    MATEMATIK_CARP_SURUMU, MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU, MerhabaMesaji,
-    MesajBasligi, PROTOKOL_SURUMU, SIRKET_ADI, SIRKET_KIMLIGI, SUNUCU_SURUMU,
-    SaglikKontroluMesaji, SaglikSonucuMesaji, SirketTanitimMesaji, SunulanHizmet,
+    MATEMATIK_CARP_SURUMU, MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU,
+    METIN_KARAKTER_SAY, METIN_KARAKTER_SAY_SURUMU, METIN_KELIME_SAY,
+    METIN_KELIME_SAY_SURUMU, MerhabaMesaji, MesajBasligi, PROTOKOL_SURUMU,
+    SIRKET_ADI, SIRKET_KIMLIGI, SUNUCU_SURUMU, SaglikKontroluMesaji,
+    SaglikSonucuMesaji, SirketTanitimMesaji, SunulanHizmet, VERI_ORTALAMA_HESAPLA,
+    VERI_ORTALAMA_HESAPLA_SURUMU,
 };
 use rust_decimal::Decimal;
 use serde::Serialize;
@@ -26,18 +29,23 @@ fn main() -> io::Result<()> {
     println!("================================");
 
     let dinleyici = TcpListener::bind(SUNUCU_ADRESI)?;
-
     println!("Tunix sunucusu başlatıldı.");
     println!("Tunix 7001 portunda motoru bekliyor...");
-    println!("Yayınlanan hizmet: {MATEMATIK_TOPLA}@{MATEMATIK_TOPLA_SURUMU}");
-    println!("Yayınlanan hizmet: {MATEMATIK_CARP}@{MATEMATIK_CARP_SURUMU}");
+    for (kimlik, surum) in [
+        (MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU),
+        (MATEMATIK_CARP, MATEMATIK_CARP_SURUMU),
+        (VERI_ORTALAMA_HESAPLA, VERI_ORTALAMA_HESAPLA_SURUMU),
+        (METIN_KELIME_SAY, METIN_KELIME_SAY_SURUMU),
+        (METIN_KARAKTER_SAY, METIN_KARAKTER_SAY_SURUMU),
+    ] {
+        println!("Yayınlanan hizmet: {kimlik}@{surum}");
+    }
     println!();
 
     for gelen_baglanti in dinleyici.incoming() {
         match gelen_baglanti {
             Ok(baglanti) => {
                 println!("Motor Tunix sunucusuna bağlandı.");
-
                 thread::spawn(move || {
                     if let Err(hata) = motor_baglantisini_yonet(baglanti) {
                         eprintln!("Motor bağlantısı hatası: {hata}");
@@ -53,18 +61,14 @@ fn main() -> io::Result<()> {
 
 fn motor_baglantisini_yonet(baglanti: TcpStream) -> io::Result<()> {
     baglanti.set_nodelay(true)?;
-
-    let okuma_baglantisi = baglanti.try_clone()?;
-    let okuyucu = BufReader::new(okuma_baglantisi);
+    let okuyucu = BufReader::new(baglanti.try_clone()?);
     let mut yazici = BufWriter::new(baglanti);
 
     for gelen_satir in okuyucu.lines() {
         let gelen_mesaj = gelen_satir?;
-
         if gelen_mesaj.trim().is_empty() {
             continue;
         }
-
         if gelen_mesaj.len() > AZAMI_MESAJ_BOYUTU_BYTE {
             return Err(io::Error::new(
                 ErrorKind::InvalidData,
@@ -72,13 +76,7 @@ fn motor_baglantisini_yonet(baglanti: TcpStream) -> io::Result<()> {
             ));
         }
 
-        let baslik: MesajBasligi = serde_json::from_str(&gelen_mesaj).map_err(|hata| {
-            io::Error::new(
-                ErrorKind::InvalidData,
-                format!("Mesaj başlığı geçerli JSON değil: {hata}"),
-            )
-        })?;
-
+        let baslik: MesajBasligi = json_ayristir(&gelen_mesaj, "mesaj başlığı")?;
         println!("Motordan mesaj geldi: {}", baslik.mesaj_turu);
 
         match baslik.mesaj_turu.as_str() {
@@ -86,9 +84,7 @@ fn motor_baglantisini_yonet(baglanti: TcpStream) -> io::Result<()> {
             "kayitSonucu" => kayit_sonucunu_isle(&gelen_mesaj)?,
             "saglikKontrolu" => saglik_kontrolunu_isle(&gelen_mesaj, &mut yazici)?,
             "isIstegi" => is_istegini_isle(&gelen_mesaj, &mut yazici)?,
-            bilinmeyen_mesaj => {
-                eprintln!("Bilinmeyen mesaj türü yok sayıldı: {bilinmeyen_mesaj}");
-            }
+            bilinmeyen => eprintln!("Bilinmeyen mesaj türü yok sayıldı: {bilinmeyen}"),
         }
     }
 
@@ -101,7 +97,6 @@ fn merhaba_mesajini_isle(
     yazici: &mut BufWriter<TcpStream>,
 ) -> io::Result<()> {
     let merhaba: MerhabaMesaji = json_ayristir(gelen_mesaj, "merhaba")?;
-
     if merhaba.protokol_surumu != PROTOKOL_SURUMU {
         return Err(io::Error::new(
             ErrorKind::InvalidData,
@@ -113,7 +108,6 @@ fn merhaba_mesajini_isle(
     }
 
     println!("Motor kimliği: {}", merhaba.motor_kimligi);
-
     let tanitim_mesaji = SirketTanitimMesaji {
         mesaj_turu: "sirketTanitim",
         mesaj_kimligi: yeni_mesaj_kimligi(),
@@ -122,32 +116,43 @@ fn merhaba_mesajini_isle(
         sirket_adi: SIRKET_ADI,
         sunucu_surumu: SUNUCU_SURUMU,
         hizmetler: vec![
-            SunulanHizmet {
-                hizmet_kimligi: MATEMATIK_TOPLA,
-                hizmet_surumu: MATEMATIK_TOPLA_SURUMU,
-                birim_fiyat: Decimal::ONE,
-                azami_eszamanli_is: 1,
-                aktif: true,
-            },
-            SunulanHizmet {
-                hizmet_kimligi: MATEMATIK_CARP,
-                hizmet_surumu: MATEMATIK_CARP_SURUMU,
-                birim_fiyat: Decimal::new(2, 0),
-                azami_eszamanli_is: 1,
-                aktif: true,
-            },
+            hizmet(MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU, Decimal::ONE),
+            hizmet(MATEMATIK_CARP, MATEMATIK_CARP_SURUMU, Decimal::new(2, 0)),
+            hizmet(
+                VERI_ORTALAMA_HESAPLA,
+                VERI_ORTALAMA_HESAPLA_SURUMU,
+                Decimal::new(3, 0),
+            ),
+            hizmet(METIN_KELIME_SAY, METIN_KELIME_SAY_SURUMU, Decimal::new(2, 0)),
+            hizmet(
+                METIN_KARAKTER_SAY,
+                METIN_KARAKTER_SAY_SURUMU,
+                Decimal::ONE,
+            ),
         ],
     };
 
     mesaj_gonder(yazici, &tanitim_mesaji)?;
     println!("Tunix tanıtım ve hizmet ilanı motora gönderildi.");
-
     Ok(())
+}
+
+fn hizmet(
+    hizmet_kimligi: &'static str,
+    hizmet_surumu: &'static str,
+    birim_fiyat: Decimal,
+) -> SunulanHizmet {
+    SunulanHizmet {
+        hizmet_kimligi,
+        hizmet_surumu,
+        birim_fiyat,
+        azami_eszamanli_is: 1,
+        aktif: true,
+    }
 }
 
 fn kayit_sonucunu_isle(gelen_mesaj: &str) -> io::Result<()> {
     let sonuc: KayitSonucuMesaji = json_ayristir(gelen_mesaj, "kayıt sonucu")?;
-
     if sonuc.basarili {
         println!("Tunix motor tarafından kaydedildi: {}", sonuc.aciklama);
         Ok(())
@@ -164,7 +169,6 @@ fn saglik_kontrolunu_isle(
     yazici: &mut BufWriter<TcpStream>,
 ) -> io::Result<()> {
     let kontrol: SaglikKontroluMesaji = json_ayristir(gelen_mesaj, "sağlık kontrolü")?;
-
     let saglik_mesaji = SaglikSonucuMesaji {
         mesaj_turu: "saglikSonucu",
         mesaj_kimligi: yeni_mesaj_kimligi(),
@@ -174,10 +178,8 @@ fn saglik_kontrolunu_isle(
         aktif_baglanti: 1,
         kuyruk_uzunlugu: 0,
     };
-
     mesaj_gonder(yazici, &saglik_mesaji)?;
     println!("Tick {} sağlık kontrolüne cevap verildi.", kontrol.tick_numarasi);
-
     Ok(())
 }
 
@@ -187,25 +189,19 @@ fn is_istegini_isle(
 ) -> io::Result<()> {
     let istek: IsIstegiMesaji = json_ayristir(gelen_mesaj, "iş isteği")?;
     let baslangic = Instant::now();
-
     let hizmet_sonucu = services::hizmeti_calistir(
         &istek.hizmet_kimligi,
         &istek.hizmet_surumu,
         &istek.istek_verisi_json,
     );
-
     let islem_suresi_ms = baslangic.elapsed().as_secs_f64() * 1_000.0;
 
     let sonuc_mesaji = match hizmet_sonucu {
         Ok(sonuc_verisi_json) => {
             println!(
                 "İş başarıyla işlendi | İş: {} | Hizmet: {}@{} | Süre: {:.3} ms",
-                istek.is_kimligi,
-                istek.hizmet_kimligi,
-                istek.hizmet_surumu,
-                islem_suresi_ms
+                istek.is_kimligi, istek.hizmet_kimligi, istek.hizmet_surumu, islem_suresi_ms
             );
-
             IsSonucuMesaji {
                 mesaj_turu: "isSonucu",
                 istek_kimligi: istek.istek_kimligi,
@@ -221,12 +217,10 @@ fn is_istegini_isle(
         Err(hata) => {
             let hata_kodu = hata.kodu();
             let hata_mesaji = hata.mesaji();
-
             eprintln!(
                 "İş başarısız | İş: {} | Kod: {} | Sebep: {}",
                 istek.is_kimligi, hata_kodu, hata_mesaji
             );
-
             IsSonucuMesaji {
                 mesaj_turu: "isSonucu",
                 istek_kimligi: istek.istek_kimligi,
@@ -266,16 +260,13 @@ where
             format!("Gönderilecek mesaj JSON'a dönüştürülemedi: {hata}"),
         )
     })?;
-
     if json.len() > AZAMI_MESAJ_BOYUTU_BYTE {
         return Err(io::Error::new(
             ErrorKind::InvalidData,
             "Gönderilecek mesaj azami boyutu aşıyor.",
         ));
     }
-
     println!("Motora gönderilen mesaj: {json}");
-
     yazici.write_all(json.as_bytes())?;
     yazici.write_all(b"\n")?;
     yazici.flush()
@@ -286,7 +277,6 @@ fn yeni_mesaj_kimligi() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-
     let sayac = MESAJ_SAYACI.fetch_add(1, Ordering::Relaxed);
     format!("tunix-{zaman}-{sayac}")
 }
