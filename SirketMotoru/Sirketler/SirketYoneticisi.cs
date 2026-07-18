@@ -36,9 +36,16 @@ public sealed class SirketYoneticisi : IAsyncDisposable
                     sirketAyari =>
                         new SirketBaglantisi(
                             motorAyarlari,
-                            sirketAyari,
-                            hizmetKatalogu))
+                            sirketAyari))
                 .ToList();
+    }
+
+    public IReadOnlyList<SirketBaglantisi>
+        BaglantilariGetir()
+    {
+        return _baglantilar
+            .ToList()
+            .AsReadOnly();
     }
 
     public async Task IlkBaglantilariKurAsync(

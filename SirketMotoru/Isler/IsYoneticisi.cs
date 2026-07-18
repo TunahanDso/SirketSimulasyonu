@@ -180,7 +180,7 @@ public sealed class IsYoneticisi
             HizmetTalebi talep,
             CancellationToken cancellationToken)
     {
-        MusteriKaydi? musteri =
+        Musteri? musteri =
             _musteriYoneticisi.MusteriyiBul(
                 talep.MusteriKimligi);
 
@@ -208,10 +208,13 @@ public sealed class IsYoneticisi
 
         if (kullanilabilirButce <= 0)
         {
-            _musteriYoneticisi.TalepBasarisizKaydet(
-                musteri,
+            _musteriYoneticisi.IslemSonucunuKaydet(
                 talep,
-                "Müşterinin kullanılabilir bakiyesi yok.");
+                basarili: false,
+                odenenTutar: 0,
+                tamamlanmaSuresiMs: 0,
+                sonucAciklamasi:
+                    "Müşterinin kullanılabilir bakiyesi yok.");
 
             return IsAtamaSonucu.BasarisizSonuc(
                 talep.IsKimligi,
@@ -227,10 +230,13 @@ public sealed class IsYoneticisi
 
         if (adaylar.Count == 0)
         {
-            _musteriYoneticisi.TalepBasarisizKaydet(
-                musteri,
+            _musteriYoneticisi.IslemSonucunuKaydet(
                 talep,
-                "Uygun şirket bulunamadı.");
+                basarili: false,
+                odenenTutar: 0,
+                tamamlanmaSuresiMs: 0,
+                sonucAciklamasi:
+                    "Uygun şirket bulunamadı.");
 
             KonsolKayitcisi.Uyari(
                 $"İşe uygun şirket bulunamadı | " +
@@ -267,27 +273,9 @@ public sealed class IsYoneticisi
         talep.TeklifEdilenTutar =
             islemTutari;
 
-        if (!_musteriYoneticisi
-            .OdemeIcinBakiyeAyir(
-                musteri,
-                talep,
-                islemTutari))
-        {
-            _musteriYoneticisi.TalepBasarisizKaydet(
-                musteri,
-                talep,
-                "Ödeme için bakiye ayrılamadı.");
-
-            return IsAtamaSonucu.BasarisizSonuc(
-                talep.IsKimligi,
-                sirket.SirketKimligi,
-                "Müşteri bakiyesi ödeme için ayrılamadı.");
-        }
-
         sirket.IsBaslat(
             hizmet.HizmetKimligi,
-            hizmet.HizmetSurumu,
-            islemTutari);
+            hizmet.HizmetSurumu);
 
         IsIstegiMesaji isIstegi =
             new()
@@ -343,22 +331,19 @@ public sealed class IsYoneticisi
             if (!dogrulama.Gecerli)
             {
                 sirket.BasarisizIsKaydet(
-                    sirketSonucu.IslemSuresiMs);
+                    "gecersiz-sonuc");
 
                 sirket.CezaUygula(
                     IslemCezasiniHesapla(
                         islemTutari));
 
-                _musteriYoneticisi
-                    .AyrilanBakiyeyiIadeEt(
-                        musteri,
-                        talep,
-                        islemTutari);
-
-                _musteriYoneticisi
-                    .TalepBasarisizKaydet(
-                        musteri,
-                        talep,
+                _musteriYoneticisi.IslemSonucunuKaydet(
+                    talep,
+                    basarili: false,
+                    odenenTutar: 0,
+                    tamamlanmaSuresiMs:
+                        sirketSonucu.IslemSuresiMs,
+                    sonucAciklamasi:
                         dogrulama.Aciklama);
 
                 KonsolKayitcisi.Uyari(
@@ -378,22 +363,46 @@ public sealed class IsYoneticisi
              * Sonuç doğrulandığı için ayrılan bakiye kesin
              * harcamaya dönüştürülür ve şirket parasını alır.
              */
-            _musteriYoneticisi.OdemeyiTamamla(
-                musteri,
-                talep,
-                sirket.SirketKimligi,
-                islemTutari,
-                sirketSonucu.SonucVerisiJson);
+            if (!_musteriYoneticisi.MusteridenOdemeAl(
+                    musteri.MusteriKimligi,
+                    islemTutari))
+            {
+                sirket.IsIptalEt();
+
+                _musteriYoneticisi.IslemSonucunuKaydet(
+                    talep,
+                    basarili: false,
+                    odenenTutar: 0,
+                    tamamlanmaSuresiMs:
+                        sirketSonucu.IslemSuresiMs,
+                    sonucAciklamasi:
+                        "Sonuç doğrulandı ancak müşteri ödemesi alınamadı.");
+
+                return IsAtamaSonucu.BasarisizSonuc(
+                    talep.IsKimligi,
+                    sirket.SirketKimligi,
+                    "Müşteri ödemesi alınamadı.",
+                    sirketSonucu.IslemSuresiMs);
+            }
+
+            double memnuniyetPuani =
+                MemnuniyetPuaniHesapla(
+                    sirketSonucu.IslemSuresiMs,
+                    ZamanAsiminiHesapla(talep));
 
             sirket.BasariliIsKaydet(
                 islemTutari,
-                sirketSonucu.IslemSuresiMs);
+                sirketSonucu.IslemSuresiMs,
+                memnuniyetPuani);
 
-            _musteriYoneticisi.SadakatiGuncelle(
-                musteri,
-                sirket.SirketKimligi,
-                basarili:
-                    true);
+            _musteriYoneticisi.IslemSonucunuKaydet(
+                talep,
+                basarili: true,
+                odenenTutar: islemTutari,
+                tamamlanmaSuresiMs:
+                    sirketSonucu.IslemSuresiMs,
+                sonucAciklamasi:
+                    "İş motor tarafından doğrulandı ve ödeme tamamlandı.");
 
             KonsolKayitcisi.Basari(
                 $"İş tamamlandı | " +
@@ -416,23 +425,13 @@ public sealed class IsYoneticisi
         {
             sirket.ZamanAsimiKaydet();
 
-            _musteriYoneticisi
-                .AyrilanBakiyeyiIadeEt(
-                    musteri,
-                    talep,
-                    islemTutari);
-
-            _musteriYoneticisi
-                .TalepBasarisizKaydet(
-                    musteri,
-                    talep,
+            _musteriYoneticisi.IslemSonucunuKaydet(
+                talep,
+                basarili: false,
+                odenenTutar: 0,
+                tamamlanmaSuresiMs: 0,
+                sonucAciklamasi:
                     "Şirket zaman aşımına uğradı.");
-
-            _musteriYoneticisi.SadakatiGuncelle(
-                musteri,
-                sirket.SirketKimligi,
-                basarili:
-                    false);
 
             KonsolKayitcisi.Uyari(
                 $"İş zaman aşımı | " +
@@ -450,36 +449,20 @@ public sealed class IsYoneticisi
         {
             sirket.IsIptalEt();
 
-            _musteriYoneticisi
-                .AyrilanBakiyeyiIadeEt(
-                    musteri,
-                    talep,
-                    islemTutari);
-
             throw;
         }
         catch (Exception exception)
         {
             sirket.BasarisizIsKaydet(
-                0);
+                "sunucu-hatasi");
 
-            _musteriYoneticisi
-                .AyrilanBakiyeyiIadeEt(
-                    musteri,
-                    talep,
-                    islemTutari);
-
-            _musteriYoneticisi
-                .TalepBasarisizKaydet(
-                    musteri,
-                    talep,
+            _musteriYoneticisi.IslemSonucunuKaydet(
+                talep,
+                basarili: false,
+                odenenTutar: 0,
+                tamamlanmaSuresiMs: 0,
+                sonucAciklamasi:
                     exception.Message);
-
-            _musteriYoneticisi.SadakatiGuncelle(
-                musteri,
-                sirket.SirketKimligi,
-                basarili:
-                    false);
 
             KonsolKayitcisi.Uyari(
                 $"İş başarısız | " +
@@ -496,7 +479,7 @@ public sealed class IsYoneticisi
 
     private IReadOnlyList<SirketAdayi>
         SirketAdaylariniOlustur(
-            MusteriKaydi musteri,
+            Musteri musteri,
             HizmetTalebi talep,
             decimal kullanilabilirButce)
     {
@@ -593,18 +576,18 @@ public sealed class IsYoneticisi
 
             double kapasitePuani =
                 Sinirla(
-                    sirket.KapasitePuaniHesapla(),
+                    sirket.KapasitePuaniHesapla(
+                        hizmet),
                     0,
                     100);
 
             double sadakatPuani =
-                Sinirla(
-                    _musteriYoneticisi
-                        .SirketSadakatPuaniGetir(
-                            musteri,
-                            sirket.SirketKimligi),
-                    0,
-                    100);
+                string.Equals(
+                    musteri.TercihEdilenSirketKimligi,
+                    sirket.SirketKimligi,
+                    StringComparison.OrdinalIgnoreCase)
+                    ? 100
+                    : 50;
 
             /*
              * Fiyat tek başına oyunu yönetmesin.
@@ -758,6 +741,28 @@ public sealed class IsYoneticisi
                 1,
                 islemTutari * 0.10m),
             2);
+    }
+
+    private static double MemnuniyetPuaniHesapla(
+        double islemSuresiMs,
+        int zamanAsimiMs)
+    {
+        if (zamanAsimiMs <= 0)
+        {
+            return 50;
+        }
+
+        double oran =
+            1.0 -
+            Math.Clamp(
+                islemSuresiMs / zamanAsimiMs,
+                0,
+                1);
+
+        return Math.Clamp(
+            50 + oran * 50,
+            0,
+            100);
     }
 
     private static double Sinirla(

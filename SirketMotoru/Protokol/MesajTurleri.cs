@@ -6,20 +6,20 @@ public static class MesajTurleri
         "merhaba";
 
     public const string SirketTanitim =
-        "sirket_tanitim";
+        "sirketTanitim";
 
     public const string KayitSonucu =
-        "kayit_sonucu";
+        "kayitSonucu";
 
     public const string SaglikKontrolu =
-        "saglik_kontrolu";
+        "saglikKontrolu";
 
     public const string SaglikSonucu =
-        "saglik_sonucu";
+        "saglikSonucu";
 
     public const string IsIstegi =
-        "is_istegi";
+        "isIstegi";
 
     public const string IsSonucu =
-        "is_sonucu";
+        "isSonucu";
 }
