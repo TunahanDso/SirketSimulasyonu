@@ -4,9 +4,11 @@ use serde::{Deserialize, Serialize};
 pub const PROTOKOL_SURUMU: &str = "0.1";
 pub const SIRKET_KIMLIGI: &str = "tunahan-tunix";
 pub const SIRKET_ADI: &str = "Tunix";
-pub const SUNUCU_SURUMU: &str = "0.2.1";
+pub const SUNUCU_SURUMU: &str = "0.3.0";
 pub const MATEMATIK_TOPLA: &str = "matematik.topla";
 pub const MATEMATIK_TOPLA_SURUMU: &str = "1.0";
+pub const MATEMATIK_CARP: &str = "matematik.carp";
+pub const MATEMATIK_CARP_SURUMU: &str = "1.0";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -121,7 +123,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tanitim_mesaji_camel_case_ve_hizmet_bilgisi_icerir() {
+    fn tanitim_mesaji_camel_case_ve_iki_hizmeti_icerir() {
         let mesaj = SirketTanitimMesaji {
             mesaj_turu: "sirketTanitim",
             mesaj_kimligi: "tunix-test-1".to_string(),
@@ -129,22 +131,34 @@ mod tests {
             sirket_kimligi: SIRKET_KIMLIGI,
             sirket_adi: SIRKET_ADI,
             sunucu_surumu: SUNUCU_SURUMU,
-            hizmetler: vec![SunulanHizmet {
-                hizmet_kimligi: MATEMATIK_TOPLA,
-                hizmet_surumu: MATEMATIK_TOPLA_SURUMU,
-                birim_fiyat: Decimal::ONE,
-                azami_eszamanli_is: 1,
-                aktif: true,
-            }],
+            hizmetler: vec![
+                SunulanHizmet {
+                    hizmet_kimligi: MATEMATIK_TOPLA,
+                    hizmet_surumu: MATEMATIK_TOPLA_SURUMU,
+                    birim_fiyat: Decimal::ONE,
+                    azami_eszamanli_is: 1,
+                    aktif: true,
+                },
+                SunulanHizmet {
+                    hizmet_kimligi: MATEMATIK_CARP,
+                    hizmet_surumu: MATEMATIK_CARP_SURUMU,
+                    birim_fiyat: Decimal::new(2, 0),
+                    azami_eszamanli_is: 1,
+                    aktif: true,
+                },
+            ],
         };
 
         let json = serde_json::to_value(mesaj).expect("mesaj serialize edilmeli");
 
         assert_eq!(json["mesajTuru"], "sirketTanitim");
         assert_eq!(json["sirketKimligi"], SIRKET_KIMLIGI);
+        assert_eq!(json["hizmetler"].as_array().map(Vec::len), Some(2));
         assert_eq!(json["hizmetler"][0]["hizmetKimligi"], MATEMATIK_TOPLA);
-        assert_eq!(json["hizmetler"][0]["azamiEszamanliIs"], 1);
+        assert_eq!(json["hizmetler"][1]["hizmetKimligi"], MATEMATIK_CARP);
         assert!(json["hizmetler"][0]["birimFiyat"].is_number());
+        assert!(json["hizmetler"][1]["birimFiyat"].is_number());
         assert_eq!(json["hizmetler"][0]["birimFiyat"], 1);
+        assert_eq!(json["hizmetler"][1]["birimFiyat"], 2);
     }
 }
