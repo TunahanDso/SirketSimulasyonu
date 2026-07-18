@@ -8,10 +8,10 @@ use std::thread;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use protocol::{
-    IsIstegiMesaji, IsSonucuMesaji, KayitSonucuMesaji, MATEMATIK_TOPLA,
-    MATEMATIK_TOPLA_SURUMU, MerhabaMesaji, MesajBasligi, PROTOKOL_SURUMU,
-    SIRKET_ADI, SIRKET_KIMLIGI, SUNUCU_SURUMU, SaglikKontroluMesaji,
-    SaglikSonucuMesaji, SirketTanitimMesaji, SunulanHizmet,
+    IsIstegiMesaji, IsSonucuMesaji, KayitSonucuMesaji, MATEMATIK_CARP,
+    MATEMATIK_CARP_SURUMU, MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU, MerhabaMesaji,
+    MesajBasligi, PROTOKOL_SURUMU, SIRKET_ADI, SIRKET_KIMLIGI, SUNUCU_SURUMU,
+    SaglikKontroluMesaji, SaglikSonucuMesaji, SirketTanitimMesaji, SunulanHizmet,
 };
 use rust_decimal::Decimal;
 use serde::Serialize;
@@ -30,6 +30,7 @@ fn main() -> io::Result<()> {
     println!("Tunix sunucusu başlatıldı.");
     println!("Tunix 7001 portunda motoru bekliyor...");
     println!("Yayınlanan hizmet: {MATEMATIK_TOPLA}@{MATEMATIK_TOPLA_SURUMU}");
+    println!("Yayınlanan hizmet: {MATEMATIK_CARP}@{MATEMATIK_CARP_SURUMU}");
     println!();
 
     for gelen_baglanti in dinleyici.incoming() {
@@ -120,13 +121,22 @@ fn merhaba_mesajini_isle(
         sirket_kimligi: SIRKET_KIMLIGI,
         sirket_adi: SIRKET_ADI,
         sunucu_surumu: SUNUCU_SURUMU,
-        hizmetler: vec![SunulanHizmet {
-            hizmet_kimligi: MATEMATIK_TOPLA,
-            hizmet_surumu: MATEMATIK_TOPLA_SURUMU,
-            birim_fiyat: Decimal::ONE,
-            azami_eszamanli_is: 1,
-            aktif: true,
-        }],
+        hizmetler: vec![
+            SunulanHizmet {
+                hizmet_kimligi: MATEMATIK_TOPLA,
+                hizmet_surumu: MATEMATIK_TOPLA_SURUMU,
+                birim_fiyat: Decimal::ONE,
+                azami_eszamanli_is: 1,
+                aktif: true,
+            },
+            SunulanHizmet {
+                hizmet_kimligi: MATEMATIK_CARP,
+                hizmet_surumu: MATEMATIK_CARP_SURUMU,
+                birim_fiyat: Decimal::new(2, 0),
+                azami_eszamanli_is: 1,
+                aktif: true,
+            },
+        ],
     };
 
     mesaj_gonder(yazici, &tanitim_mesaji)?;
