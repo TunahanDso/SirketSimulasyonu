@@ -1,0 +1,28 @@
+﻿{
+  "motorKimligi": "ana-motor",
+  "protokolSurumu": "0.1",
+  "tickSuresiSaniye": 10,
+  "baglantiZamanAsimiMs": 3000,
+  "mesajZamanAsimiMs": 3000,
+  "azamiMesajBoyutuByte": 65536,
+  "sirketler": [
+    {
+      "sirketKimligi": "tunahan-tunix",
+      "sirketAdi": "Tunix",
+      "adres": "127.0.0.1",
+      "port": 7001
+    },
+    {
+      "sirketKimligi": "mustafa-mudaf",
+      "sirketAdi": "Mudaf",
+      "adres": "192.168.1.26",
+      "port": 7002
+    },
+    {
+      "sirketKimligi": "ugur-ugax",
+      "sirketAdi": "Ugax",
+      "adres": "192.168.1.36",
+      "port": 7003
+    }
+  ]
+}
