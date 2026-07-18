@@ -1,6 +1,9 @@
+mod matematik_carp;
 mod matematik_topla;
 
-use crate::protocol::{MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU};
+use crate::protocol::{
+    MATEMATIK_CARP, MATEMATIK_CARP_SURUMU, MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU,
+};
 
 #[derive(Debug)]
 pub enum HizmetHatasi {
@@ -26,13 +29,13 @@ impl HizmetHatasi {
                 "İstenen hizmet veya hizmet sürümü Tunix tarafından sunulmuyor.".to_string()
             }
             Self::GecersizIstek(aciklama) => {
-                format!("Toplama isteği geçersiz: {aciklama}")
+                format!("Hizmet isteği geçersiz: {aciklama}")
             }
             Self::HesaplamaTasmasi => {
-                "Toplama işlemi desteklenen sayısal sınırı aştı.".to_string()
+                "Hesaplama desteklenen sayısal sınırı aştı.".to_string()
             }
             Self::SonucSerilestirme(aciklama) => {
-                format!("Toplama sonucu JSON biçimine dönüştürülemedi: {aciklama}")
+                format!("Hizmet sonucu JSON biçimine dönüştürülemedi: {aciklama}")
             }
         }
     }
@@ -46,6 +49,9 @@ pub fn hizmeti_calistir(
     match (hizmet_kimligi, hizmet_surumu) {
         (MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU) => {
             matematik_topla::calistir(istek_verisi_json)
+        }
+        (MATEMATIK_CARP, MATEMATIK_CARP_SURUMU) => {
+            matematik_carp::calistir(istek_verisi_json)
         }
         _ => Err(HizmetHatasi::DesteklenmeyenHizmet),
     }
