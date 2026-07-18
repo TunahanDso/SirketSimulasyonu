@@ -1,27 +1,23 @@
-use std::io::{self, BufRead, BufReader, BufWriter, Write};
+mod protocol;
+mod services;
+
+use std::io::{self, BufRead, BufReader, BufWriter, ErrorKind, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-// Tunix sunucusunun dinleyeceği adres.
-//
-// 0.0.0.0:
-// Hem aynı bilgisayardan hem de yerel ağdaki diğer
-// bilgisayarlardan bağlantı kabul eder.
-//
-// 7001:
-// Tunix şirketinin portudur.
+use protocol::{
+    IsIstegiMesaji, IsSonucuMesaji, KayitSonucuMesaji, MATEMATIK_TOPLA,
+    MATEMATIK_TOPLA_SURUMU, MerhabaMesaji, MesajBasligi, PROTOKOL_SURUMU,
+    SIRKET_ADI, SIRKET_KIMLIGI, SUNUCU_SURUMU, SaglikKontroluMesaji,
+    SaglikSonucuMesaji, SirketTanitimMesaji, SunulanHizmet,
+};
+use rust_decimal::Decimal;
+use serde::Serialize;
+
 const SUNUCU_ADRESI: &str = "0.0.0.0:7001";
-
-// Motorun şirketi tanıyacağı bilgiler.
-const SIRKET_KIMLIGI: &str = "tunahan-tunix";
-const SIRKET_ADI: &str = "Tunix";
-const PROTOKOL_SURUMU: &str = "0.1";
-const SUNUCU_SURUMU: &str = "0.1";
-
-// Aynı milisaniyede birden fazla mesaj üretilirse
-// mesaj kimliklerinin çakışmaması için sayaç kullanıyoruz.
+const AZAMI_MESAJ_BOYUTU_BYTE: usize = 65_536;
 static MESAJ_SAYACI: AtomicU64 = AtomicU64::new(1);
 
 fn main() -> io::Result<()> {
@@ -29,398 +25,258 @@ fn main() -> io::Result<()> {
     println!("          TUNIX SERVER");
     println!("================================");
 
-    // İşletim sisteminden 7001 portunu istiyoruz.
     let dinleyici = TcpListener::bind(SUNUCU_ADRESI)?;
 
-    println!("Tunix sunucusu baslatildi.");
+    println!("Tunix sunucusu başlatıldı.");
     println!("Tunix 7001 portunda motoru bekliyor...");
+    println!("Yayınlanan hizmet: {MATEMATIK_TOPLA}@{MATEMATIK_TOPLA_SURUMU}");
     println!();
 
-    // Sunucu kapanmadığı sürece yeni bağlantıları bekler.
     for gelen_baglanti in dinleyici.incoming() {
         match gelen_baglanti {
             Ok(baglanti) => {
-                println!("Motor Tunix sunucusuna baglandi.");
+                println!("Motor Tunix sunucusuna bağlandı.");
 
-                // Her motor bağlantısını ayrı iş parçacığında
-                // çalıştırıyoruz.
                 thread::spawn(move || {
                     if let Err(hata) = motor_baglantisini_yonet(baglanti) {
-                        eprintln!("Motor baglantisi hatasi: {hata}");
+                        eprintln!("Motor bağlantısı hatası: {hata}");
                     }
                 });
             }
-
-            Err(hata) => {
-                eprintln!("Baglanti kabul edilemedi: {hata}");
-            }
+            Err(hata) => eprintln!("Bağlantı kabul edilemedi: {hata}"),
         }
     }
 
     Ok(())
 }
 
-// Bir motor bağlantısının bütün yaşam döngüsünü yönetir.
 fn motor_baglantisini_yonet(baglanti: TcpStream) -> io::Result<()> {
-    // Aynı TCP bağlantısını hem okumak hem yazmak istiyoruz.
-    //
-    // Bu yüzden bağlantının bir kopyasını okuma tarafına,
-    // aslını da yazma tarafına veriyoruz.
-    let okuma_baglantisi = baglanti.try_clone()?;
+    baglanti.set_nodelay(true)?;
 
+    let okuma_baglantisi = baglanti.try_clone()?;
     let okuyucu = BufReader::new(okuma_baglantisi);
     let mut yazici = BufWriter::new(baglanti);
 
-    // TCP bir mesaj sistemi değil, veri akışıdır.
-    //
-    // Motor her JSON mesajının sonuna "\n" koyduğu için
-    // BufReader satır satır okuyabilir.
     for gelen_satir in okuyucu.lines() {
-        let gelen_mesaj = match gelen_satir {
-            Ok(mesaj) => mesaj,
+        let gelen_mesaj = gelen_satir?;
 
-            Err(hata) => {
-                eprintln!("Motordan mesaj okunamadi: {hata}");
-                break;
-            }
-        };
-
-        // Boş satır geldiyse işlemiyoruz.
         if gelen_mesaj.trim().is_empty() {
             continue;
         }
 
-        println!();
-        println!("Motordan ham mesaj geldi:");
-        println!("{gelen_mesaj}");
+        if gelen_mesaj.len() > AZAMI_MESAJ_BOYUTU_BYTE {
+            return Err(io::Error::new(
+                ErrorKind::InvalidData,
+                "Motorun gönderdiği mesaj azami boyutu aşıyor.",
+            ));
+        }
 
-        // Mesajın hangi türde olduğunu JSON içinden buluyoruz.
-        let mesaj_turu = match json_metin_al(&gelen_mesaj, "mesajTuru") {
-            Some(deger) => deger,
+        let baslik: MesajBasligi = serde_json::from_str(&gelen_mesaj).map_err(|hata| {
+            io::Error::new(
+                ErrorKind::InvalidData,
+                format!("Mesaj başlığı geçerli JSON değil: {hata}"),
+            )
+        })?;
 
-            None => {
-                eprintln!("Mesajda mesajTuru bulunamadi.");
-                continue;
-            }
-        };
+        println!("Motordan mesaj geldi: {}", baslik.mesaj_turu);
 
-        println!("Motordan mesaj geldi: {mesaj_turu}");
-
-        match mesaj_turu.as_str() {
-            "merhaba" => {
-                merhaba_mesajini_isle(
-                    &gelen_mesaj,
-                    &mut yazici,
-                )?;
-            }
-
-            "kayitSonucu" => {
-                kayit_sonucunu_isle(&gelen_mesaj);
-            }
-
-            "saglikKontrolu" => {
-                saglik_kontrolunu_isle(
-                    &gelen_mesaj,
-                    &mut yazici,
-                )?;
-            }
-
+        match baslik.mesaj_turu.as_str() {
+            "merhaba" => merhaba_mesajini_isle(&gelen_mesaj, &mut yazici)?,
+            "kayitSonucu" => kayit_sonucunu_isle(&gelen_mesaj)?,
+            "saglikKontrolu" => saglik_kontrolunu_isle(&gelen_mesaj, &mut yazici)?,
+            "isIstegi" => is_istegini_isle(&gelen_mesaj, &mut yazici)?,
             bilinmeyen_mesaj => {
-                println!(
-                    "Bilinmeyen mesaj turu: {bilinmeyen_mesaj}"
-                );
+                eprintln!("Bilinmeyen mesaj türü yok sayıldı: {bilinmeyen_mesaj}");
             }
         }
     }
 
-    println!("Motor Tunix baglantisini kapatti.");
-
+    println!("Motor Tunix bağlantısını kapattı.");
     Ok(())
 }
 
-// Motorun ilk gönderdiği "merhaba" mesajını işler.
 fn merhaba_mesajini_isle(
     gelen_mesaj: &str,
     yazici: &mut BufWriter<TcpStream>,
 ) -> io::Result<()> {
-    if let Some(motor_kimligi) =
-        json_metin_al(gelen_mesaj, "motorKimligi")
-    {
-        println!("Motor kimligi: {motor_kimligi}");
+    let merhaba: MerhabaMesaji = json_ayristir(gelen_mesaj, "merhaba")?;
+
+    if merhaba.protokol_surumu != PROTOKOL_SURUMU {
+        return Err(io::Error::new(
+            ErrorKind::InvalidData,
+            format!(
+                "Desteklenmeyen protokol sürümü. Beklenen: {PROTOKOL_SURUMU}, gelen: {}",
+                merhaba.protokol_surumu
+            ),
+        ));
     }
 
-    if let Some(protokol_surumu) =
-        json_metin_al(gelen_mesaj, "protokolSurumu")
-    {
-        println!(
-            "Motor protokol surumu: {protokol_surumu}"
-        );
-    }
+    println!("Motor kimliği: {}", merhaba.motor_kimligi);
 
-    // Tunix kendisini motora tanıtıyor.
-    let tanitim_mesaji = format!(
-        concat!(
-            "{{",
-            "\"mesajTuru\":\"sirketTanitim\",",
-            "\"mesajKimligi\":\"{}\",",
-            "\"protokolSurumu\":\"{}\",",
-            "\"sirketKimligi\":\"{}\",",
-            "\"sirketAdi\":\"{}\",",
-            "\"sunucuSurumu\":\"{}\"",
-            "}}"
-        ),
-        yeni_mesaj_kimligi(),
-        json_kacis(PROTOKOL_SURUMU),
-        json_kacis(SIRKET_KIMLIGI),
-        json_kacis(SIRKET_ADI),
-        json_kacis(SUNUCU_SURUMU),
-    );
+    let tanitim_mesaji = SirketTanitimMesaji {
+        mesaj_turu: "sirketTanitim",
+        mesaj_kimligi: yeni_mesaj_kimligi(),
+        protokol_surumu: PROTOKOL_SURUMU,
+        sirket_kimligi: SIRKET_KIMLIGI,
+        sirket_adi: SIRKET_ADI,
+        sunucu_surumu: SUNUCU_SURUMU,
+        hizmetler: vec![SunulanHizmet {
+            hizmet_kimligi: MATEMATIK_TOPLA,
+            hizmet_surumu: MATEMATIK_TOPLA_SURUMU,
+            birim_fiyat: Decimal::ONE,
+            azami_eszamanli_is: 1,
+            aktif: true,
+        }],
+    };
 
     mesaj_gonder(yazici, &tanitim_mesaji)?;
-
-    println!("Tunix tanitim mesaji motora gonderildi.");
+    println!("Tunix tanıtım ve hizmet ilanı motora gönderildi.");
 
     Ok(())
 }
 
-// Motorun şirket kaydını kabul edip etmediğini işler.
-fn kayit_sonucunu_isle(gelen_mesaj: &str) {
-    let basarili =
-        json_bool_al(gelen_mesaj, "basarili").unwrap_or(false);
+fn kayit_sonucunu_isle(gelen_mesaj: &str) -> io::Result<()> {
+    let sonuc: KayitSonucuMesaji = json_ayristir(gelen_mesaj, "kayıt sonucu")?;
 
-    let aciklama =
-        json_metin_al(gelen_mesaj, "aciklama")
-            .unwrap_or_else(|| {
-                "Motor aciklama gondermedi.".to_string()
-            });
-
-    if basarili {
-        println!("Tunix motor tarafindan kaydedildi.");
-        println!("Aciklama: {aciklama}");
+    if sonuc.basarili {
+        println!("Tunix motor tarafından kaydedildi: {}", sonuc.aciklama);
+        Ok(())
     } else {
-        println!("Tunix kaydi reddedildi.");
-        println!("Sebep: {aciklama}");
+        Err(io::Error::new(
+            ErrorKind::PermissionDenied,
+            format!("Tunix kaydı reddedildi: {}", sonuc.aciklama),
+        ))
     }
 }
 
-// Motorun gönderdiği sağlık kontrolüne cevap verir.
 fn saglik_kontrolunu_isle(
     gelen_mesaj: &str,
     yazici: &mut BufWriter<TcpStream>,
 ) -> io::Result<()> {
-    // Motor, isteği gönderirken bir istek kimliği oluşturur.
-    // Tunix cevabında aynı kimliği geri göndermelidir.
-    let istek_kimligi =
-        match json_metin_al(gelen_mesaj, "istekKimligi") {
-            Some(deger) => deger,
+    let kontrol: SaglikKontroluMesaji = json_ayristir(gelen_mesaj, "sağlık kontrolü")?;
 
-            None => {
-                eprintln!(
-                    "Saglik kontrolunde istekKimligi bulunamadi."
-                );
-
-                return Ok(());
-            }
-        };
-
-    let tick_numarasi =
-        json_tamsayi_al(gelen_mesaj, "tickNumarasi")
-            .unwrap_or(0);
-
-    let saglik_mesaji = format!(
-        concat!(
-            "{{",
-            "\"mesajTuru\":\"saglikSonucu\",",
-            "\"mesajKimligi\":\"{}\",",
-            "\"protokolSurumu\":\"{}\",",
-            "\"istekKimligi\":\"{}\",",
-            "\"durum\":\"calisiyor\",",
-            "\"aktifBaglanti\":1,",
-            "\"kuyrukUzunlugu\":0",
-            "}}"
-        ),
-        yeni_mesaj_kimligi(),
-        json_kacis(PROTOKOL_SURUMU),
-        json_kacis(&istek_kimligi),
-    );
+    let saglik_mesaji = SaglikSonucuMesaji {
+        mesaj_turu: "saglikSonucu",
+        mesaj_kimligi: yeni_mesaj_kimligi(),
+        protokol_surumu: PROTOKOL_SURUMU,
+        istek_kimligi: kontrol.istek_kimligi,
+        durum: "calisiyor",
+        aktif_baglanti: 1,
+        kuyruk_uzunlugu: 0,
+    };
 
     mesaj_gonder(yazici, &saglik_mesaji)?;
+    println!("Tick {} sağlık kontrolüne cevap verildi.", kontrol.tick_numarasi);
 
-    println!(
-        "Tick {tick_numarasi} saglik kontrolune cevap verildi."
+    Ok(())
+}
+
+fn is_istegini_isle(
+    gelen_mesaj: &str,
+    yazici: &mut BufWriter<TcpStream>,
+) -> io::Result<()> {
+    let istek: IsIstegiMesaji = json_ayristir(gelen_mesaj, "iş isteği")?;
+    let baslangic = Instant::now();
+
+    let hizmet_sonucu = services::hizmeti_calistir(
+        &istek.hizmet_kimligi,
+        &istek.hizmet_surumu,
+        &istek.istek_verisi_json,
     );
 
-    Ok(())
+    let islem_suresi_ms = baslangic.elapsed().as_secs_f64() * 1_000.0;
+
+    let sonuc_mesaji = match hizmet_sonucu {
+        Ok(sonuc_verisi_json) => {
+            println!(
+                "İş başarıyla işlendi | İş: {} | Hizmet: {}@{} | Süre: {:.3} ms",
+                istek.is_kimligi,
+                istek.hizmet_kimligi,
+                istek.hizmet_surumu,
+                islem_suresi_ms
+            );
+
+            IsSonucuMesaji {
+                mesaj_turu: "isSonucu",
+                istek_kimligi: istek.istek_kimligi,
+                is_kimligi: istek.is_kimligi,
+                sirket_kimligi: SIRKET_KIMLIGI,
+                basarili: true,
+                sonuc_verisi_json,
+                hata_kodu: None,
+                hata_mesaji: None,
+                islem_suresi_ms,
+            }
+        }
+        Err(hata) => {
+            let hata_kodu = hata.kodu();
+            let hata_mesaji = hata.mesaji();
+
+            eprintln!(
+                "İş başarısız | İş: {} | Kod: {} | Sebep: {}",
+                istek.is_kimligi, hata_kodu, hata_mesaji
+            );
+
+            IsSonucuMesaji {
+                mesaj_turu: "isSonucu",
+                istek_kimligi: istek.istek_kimligi,
+                is_kimligi: istek.is_kimligi,
+                sirket_kimligi: SIRKET_KIMLIGI,
+                basarili: false,
+                sonuc_verisi_json: "{}".to_string(),
+                hata_kodu: Some(hata_kodu),
+                hata_mesaji: Some(hata_mesaji),
+                islem_suresi_ms,
+            }
+        }
+    };
+
+    mesaj_gonder(yazici, &sonuc_mesaji)
 }
 
-// Hazırlanan JSON mesajını TCP bağlantısından gönderir.
-fn mesaj_gonder(
-    yazici: &mut BufWriter<TcpStream>,
-    mesaj: &str,
-) -> io::Result<()> {
-    println!("Motora gonderilen mesaj:");
-    println!("{mesaj}");
+fn json_ayristir<T>(json: &str, mesaj_adi: &str) -> io::Result<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    serde_json::from_str(json).map_err(|hata| {
+        io::Error::new(
+            ErrorKind::InvalidData,
+            format!("{mesaj_adi} ayrıştırılamadı: {hata}"),
+        )
+    })
+}
 
-    // Protokol gereği her JSON mesajının sonuna
-    // satır sonu ekliyoruz.
-    yazici.write_all(mesaj.as_bytes())?;
+fn mesaj_gonder<T>(yazici: &mut BufWriter<TcpStream>, mesaj: &T) -> io::Result<()>
+where
+    T: Serialize,
+{
+    let json = serde_json::to_string(mesaj).map_err(|hata| {
+        io::Error::new(
+            ErrorKind::InvalidData,
+            format!("Gönderilecek mesaj JSON'a dönüştürülemedi: {hata}"),
+        )
+    })?;
+
+    if json.len() > AZAMI_MESAJ_BOYUTU_BYTE {
+        return Err(io::Error::new(
+            ErrorKind::InvalidData,
+            "Gönderilecek mesaj azami boyutu aşıyor.",
+        ));
+    }
+
+    println!("Motora gönderilen mesaj: {json}");
+
+    yazici.write_all(json.as_bytes())?;
     yazici.write_all(b"\n")?;
-
-    // BufWriter veriyi bellekte bekletebilir.
-    // flush ile hemen ağa gönderilmesini sağlıyoruz.
-    yazici.flush()?;
-
-    Ok(())
+    yazici.flush()
 }
 
-// Her giden mesaj için benzersiz kimlik üretir.
 fn yeni_mesaj_kimligi() -> String {
     let zaman = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
 
-    let sayac =
-        MESAJ_SAYACI.fetch_add(1, Ordering::Relaxed);
-
+    let sayac = MESAJ_SAYACI.fetch_add(1, Ordering::Relaxed);
     format!("tunix-{zaman}-{sayac}")
-}
-
-// JSON içinde metin türündeki bir alanı bulur.
-//
-// Örnek:
-//
-// {"mesajTuru":"merhaba"}
-//
-// json_metin_al(json, "mesajTuru")
-// sonucu:
-// Some("merhaba")
-fn json_metin_al(json: &str, alan_adi: &str) -> Option<String> {
-    let aranan = format!("\"{alan_adi}\"");
-
-    let alan_baslangici = json.find(&aranan)?;
-
-    let alan_sonrasi =
-        &json[alan_baslangici + aranan.len()..];
-
-    let iki_nokta = alan_sonrasi.find(':')?;
-
-    let deger_bolumu =
-        alan_sonrasi[iki_nokta + 1..].trim_start();
-
-    if !deger_bolumu.starts_with('"') {
-        return None;
-    }
-
-    let karakterler =
-        deger_bolumu[1..].chars();
-
-    let mut sonuc = String::new();
-    let mut kacis_var = false;
-
-    for karakter in karakterler {
-        if kacis_var {
-            match karakter {
-                '"' => sonuc.push('"'),
-                '\\' => sonuc.push('\\'),
-                'n' => sonuc.push('\n'),
-                'r' => sonuc.push('\r'),
-                't' => sonuc.push('\t'),
-                diger => sonuc.push(diger),
-            }
-
-            kacis_var = false;
-            continue;
-        }
-
-        if karakter == '\\' {
-            kacis_var = true;
-            continue;
-        }
-
-        if karakter == '"' {
-            return Some(sonuc);
-        }
-
-        sonuc.push(karakter);
-    }
-
-    None
-}
-
-// JSON içindeki true veya false değerini okur.
-fn json_bool_al(json: &str, alan_adi: &str) -> Option<bool> {
-    let ham_deger = json_ham_deger_al(json, alan_adi)?;
-
-    match ham_deger.as_str() {
-        "true" => Some(true),
-        "false" => Some(false),
-        _ => None,
-    }
-}
-
-// JSON içindeki tam sayı değerini okur.
-fn json_tamsayi_al(
-    json: &str,
-    alan_adi: &str,
-) -> Option<i64> {
-    let ham_deger = json_ham_deger_al(json, alan_adi)?;
-
-    ham_deger.parse::<i64>().ok()
-}
-
-// JSON içindeki tırnaksız ham değeri bulur.
-//
-// Bu fonksiyon boolean ve sayı alanları için kullanılır.
-fn json_ham_deger_al(
-    json: &str,
-    alan_adi: &str,
-) -> Option<String> {
-    let aranan = format!("\"{alan_adi}\"");
-
-    let alan_baslangici = json.find(&aranan)?;
-
-    let alan_sonrasi =
-        &json[alan_baslangici + aranan.len()..];
-
-    let iki_nokta = alan_sonrasi.find(':')?;
-
-    let deger_bolumu =
-        alan_sonrasi[iki_nokta + 1..].trim_start();
-
-    let deger_sonu = deger_bolumu
-        .find(|karakter: char| {
-            karakter == ',' ||
-            karakter == '}' ||
-            karakter.is_whitespace()
-        })
-        .unwrap_or(deger_bolumu.len());
-
-    let sonuc =
-        deger_bolumu[..deger_sonu].trim();
-
-    if sonuc.is_empty() {
-        None
-    } else {
-        Some(sonuc.to_string())
-    }
-}
-
-// JSON içine koyacağımız metinlerde özel karakterleri
-// güvenli biçime dönüştürür.
-fn json_kacis(metin: &str) -> String {
-    let mut sonuc = String::new();
-
-    for karakter in metin.chars() {
-        match karakter {
-            '"' => sonuc.push_str("\\\""),
-            '\\' => sonuc.push_str("\\\\"),
-            '\n' => sonuc.push_str("\\n"),
-            '\r' => sonuc.push_str("\\r"),
-            '\t' => sonuc.push_str("\\t"),
-            diger => sonuc.push(diger),
-        }
-    }
-
-    sonuc
 }
