@@ -4,16 +4,17 @@ mod services;
 use std::io::{self, BufRead, BufReader, BufWriter, ErrorKind, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use protocol::{
-    IsIstegiMesaji, IsSonucuMesaji, KayitSonucuMesaji, MATEMATIK_CARP,
-    MATEMATIK_CARP_SURUMU, MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU,
+    FinansDurumuMesaji, IsIstegiMesaji, IsSonucuMesaji, KayitSonucuMesaji,
+    MATEMATIK_CARP, MATEMATIK_CARP_SURUMU, MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU,
     METIN_KARAKTER_SAY, METIN_KARAKTER_SAY_SURUMU, METIN_KELIME_SAY,
-    METIN_KELIME_SAY_SURUMU, MerhabaMesaji, MesajBasligi, PROTOKOL_SURUMU,
-    SIRKET_ADI, SIRKET_KIMLIGI, SUNUCU_SURUMU, SaglikKontroluMesaji,
-    SaglikSonucuMesaji, SirketTanitimMesaji, SunulanHizmet, VERI_ORTALAMA_HESAPLA,
+    METIN_KELIME_SAY_SURUMU, MerhabaMesaji, MesajBasligi, PROTOKOL_SURUMU, SIRKET_ADI,
+    SIRKET_KIMLIGI, SUNUCU_SURUMU, SaglikKontroluMesaji, SaglikSonucuMesaji,
+    SirketTanitimMesaji, SunulanHizmet, VERI_ORTALAMA_HESAPLA,
     VERI_ORTALAMA_HESAPLA_SURUMU,
 };
 use rust_decimal::Decimal;
@@ -22,6 +23,7 @@ use serde::Serialize;
 const SUNUCU_ADRESI: &str = "0.0.0.0:7001";
 const AZAMI_MESAJ_BOYUTU_BYTE: usize = 65_536;
 static MESAJ_SAYACI: AtomicU64 = AtomicU64::new(1);
+static SON_FINANS_DURUMU: OnceLock<Mutex<Option<FinansDurumuMesaji>>> = OnceLock::new();
 
 fn main() -> io::Result<()> {
     println!("================================");
@@ -30,6 +32,7 @@ fn main() -> io::Result<()> {
 
     let dinleyici = TcpListener::bind(SUNUCU_ADRESI)?;
     println!("Tunix sunucusu başlatıldı.");
+    println!("Sunucu sürümü: {SUNUCU_SURUMU}");
     println!("Tunix 7001 portunda motoru bekliyor...");
     for (kimlik, surum) in [
         (MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU),
@@ -84,6 +87,7 @@ fn motor_baglantisini_yonet(baglanti: TcpStream) -> io::Result<()> {
             "kayitSonucu" => kayit_sonucunu_isle(&gelen_mesaj)?,
             "saglikKontrolu" => saglik_kontrolunu_isle(&gelen_mesaj, &mut yazici)?,
             "isIstegi" => is_istegini_isle(&gelen_mesaj, &mut yazici)?,
+            "finansDurumu" => finans_durumunu_isle(&gelen_mesaj)?,
             bilinmeyen => eprintln!("Bilinmeyen mesaj türü yok sayıldı: {bilinmeyen}"),
         }
     }
@@ -162,6 +166,51 @@ fn kayit_sonucunu_isle(gelen_mesaj: &str) -> io::Result<()> {
             format!("Tunix kaydı reddedildi: {}", sonuc.aciklama),
         ))
     }
+}
+
+fn finans_durumunu_isle(gelen_mesaj: &str) -> io::Result<()> {
+    let finans: FinansDurumuMesaji = json_ayristir(gelen_mesaj, "finans durumu")?;
+
+    if finans.protokol_surumu != PROTOKOL_SURUMU {
+        return Err(io::Error::new(
+            ErrorKind::InvalidData,
+            format!(
+                "Finans mesajı protokol sürümü uyuşmuyor. Beklenen: {PROTOKOL_SURUMU}, gelen: {}",
+                finans.protokol_surumu
+            ),
+        ));
+    }
+
+    if finans.sirket_kimligi != SIRKET_KIMLIGI {
+        return Err(io::Error::new(
+            ErrorKind::PermissionDenied,
+            format!(
+                "Finans mesajı başka şirkete ait. Beklenen: {SIRKET_KIMLIGI}, gelen: {}",
+                finans.sirket_kimligi
+            ),
+        ));
+    }
+
+    let kasa = finans.kasa;
+    let net_gelir = finans.net_gelir;
+    let toplam_gelir = finans.toplam_gelir;
+    let toplam_ceza = finans.toplam_ceza;
+    let toplam_iade = finans.toplam_iade;
+    let tamamlanan_is = finans.tamamlanan_is_sayisi;
+    let basarisiz_is = finans.basarisiz_is_sayisi;
+    let tick = finans.tick_numarasi;
+
+    let finans_kilidi = SON_FINANS_DURUMU.get_or_init(|| Mutex::new(None));
+    let mut son_durum = finans_kilidi
+        .lock()
+        .map_err(|_| io::Error::other("Finans durumu kilidi zehirlendi."))?;
+    *son_durum = Some(finans);
+
+    println!(
+        "Tunix finans durumu güncellendi | Tick: {tick} | Kasa: {kasa} | Net gelir: {net_gelir} | Toplam gelir: {toplam_gelir} | İade: {toplam_iade} | Ceza: {toplam_ceza} | Başarılı iş: {tamamlanan_is} | Başarısız iş: {basarisiz_is}"
+    );
+
+    Ok(())
 }
 
 fn saglik_kontrolunu_isle(
