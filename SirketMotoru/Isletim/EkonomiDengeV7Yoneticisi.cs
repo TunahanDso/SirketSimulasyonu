@@ -6,12 +6,14 @@ namespace SirketMotoru.Isletim;
 
 public sealed class EkonomiDengeV7Yoneticisi
 {
+    private sealed record Baslangic(decimal OdenmisGider, decimal OdenemeyenGider);
+
     private readonly SirketYoneticisi _sirketler;
     private readonly SirketIsletimYoneticisi _temel;
     private readonly FieldInfo _veriAlani;
     private readonly FieldInfo _kilitAlani;
     private readonly MethodInfo _kaydetMetodu;
-    private readonly Dictionary<string, decimal> _oncekiIsletmeGideri = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Baslangic> _baslangiclar = new(StringComparer.OrdinalIgnoreCase);
 
     public EkonomiDengeV7Yoneticisi(
         SirketYoneticisi sirketler,
@@ -39,10 +41,15 @@ public sealed class EkonomiDengeV7Yoneticisi
         await kilit.WaitAsync(cancellationToken);
         try
         {
-            _oncekiIsletmeGideri.Clear();
+            _baslangiclar.Clear();
             SirketIsletimDosyasi veri = Veri();
             foreach (SirketKaydi sirket in _sirketler.SirketKayitlari)
-                _oncekiIsletmeGideri[sirket.SirketKimligi] = Durum(veri, sirket.SirketKimligi).ToplamIsletmeGideri;
+            {
+                SirketIsletimDurumu durum = Durum(veri, sirket.SirketKimligi);
+                _baslangiclar[sirket.SirketKimligi] = new Baslangic(
+                    durum.ToplamIsletmeGideri,
+                    durum.OdenemeyenGider);
+            }
         }
         finally { kilit.Release(); }
     }
@@ -57,32 +64,58 @@ public sealed class EkonomiDengeV7Yoneticisi
             foreach (SirketKaydi sirket in _sirketler.SirketKayitlari)
             {
                 SirketIsletimDurumu durum = Durum(veri, sirket.SirketKimligi);
-                decimal onceki = _oncekiIsletmeGideri.TryGetValue(sirket.SirketKimligi, out decimal x) ? x : durum.ToplamIsletmeGideri;
-                decimal buTick = Math.Max(0, durum.ToplamIsletmeGideri - onceki);
-                decimal hedef = SürdürülebilirTickGideri(sirket, durum);
-                if (buTick <= hedef * 1.10m) continue;
+                Baslangic onceki = _baslangiclar.TryGetValue(sirket.SirketKimligi, out Baslangic? x)
+                    ? x
+                    : new Baslangic(durum.ToplamIsletmeGideri, durum.OdenemeyenGider);
 
-                decimal duzeltme = decimal.Round(buTick - hedef, 2);
-                durum.ToplamIsletmeGideri = Math.Max(onceki, durum.ToplamIsletmeGideri - duzeltme);
-                sirket.Kasa += duzeltme;
+                decimal odenmisArtis = Math.Max(0, durum.ToplamIsletmeGideri - onceki.OdenmisGider);
+                decimal odenemeyenArtis = Math.Max(0, durum.OdenemeyenGider - onceki.OdenemeyenGider);
+                decimal toplamYukumluluk = odenmisArtis + odenemeyenArtis;
+                decimal hedef = SurdurulebilirTickGideri(sirket, durum);
+                if (toplamYukumluluk <= hedef * 1.10m) continue;
+
+                decimal toplamDuzeltme = decimal.Round(toplamYukumluluk - hedef, 2);
+
+                // Önce henüz ödenmemiş ve yalnız eski aşırı ölçek formülünden doğan
+                // yükümlülük silinir; kalan düzeltme gerçekten kasadan çıkmışsa iade edilir.
+                decimal odenemeyenDuzeltme = Math.Min(odenemeyenArtis, toplamDuzeltme);
+                durum.OdenemeyenGider = Math.Max(
+                    onceki.OdenemeyenGider,
+                    durum.OdenemeyenGider - odenemeyenDuzeltme);
+
+                decimal nakitDuzeltmesi = Math.Min(
+                    odenmisArtis,
+                    Math.Max(0, toplamDuzeltme - odenemeyenDuzeltme));
+                if (nakitDuzeltmesi > 0)
+                {
+                    durum.ToplamIsletmeGideri = Math.Max(
+                        onceki.OdenmisGider,
+                        durum.ToplamIsletmeGideri - nakitDuzeltmesi);
+                    sirket.Kasa += nakitDuzeltmesi;
+                }
+
                 durum.SonIslemler.Add(new IsletimIslemKaydi
                 {
                     IslemKimligi = $"v7-gider-dengeleme-{Guid.NewGuid():N}",
                     TickNumarasi = tickNumarasi,
                     IslemTuru = "operasyon-maliyet-normalizasyonu",
-                    Aciklama = $"Eski ölçek formülünün aşırı sabit maliyeti V7 fiziksel kaynak modeline göre {duzeltme:N2} TL azaltıldı. Gerçek yatırım, kullanıcı, finansman, ceza ve piyasa giderleri korunur.",
+                    Aciklama = $"Eski ölçek formülünün {toplamDuzeltme:N2} TL aşırı sabit maliyeti V7 fiziksel kaynak modeline göre kaldırıldı. Ödenemeyen düzeltme: {odenemeyenDuzeltme:N2} TL; nakit iadesi: {nakitDuzeltmesi:N2} TL. Gerçek yatırım, kullanıcı, finansman, ceza ve piyasa giderleri korunur.",
                     Tutar = 0
                 });
                 if (durum.SonIslemler.Count > 200)
                     durum.SonIslemler = durum.SonIslemler.TakeLast(200).ToList();
-                KonsolKayitcisi.Bilgi($"V7 GİDER DENGESİ | {sirket.SirketAdi} | Eski tick gideri: {buTick:N2} | Etkin gider: {hedef:N2}");
+
+                KonsolKayitcisi.Bilgi(
+                    $"V7 GİDER DENGESİ | {sirket.SirketAdi} | " +
+                    $"Eski yükümlülük: {toplamYukumluluk:N2} | Etkin gider: {hedef:N2} | " +
+                    $"Ödenemeyen silindi: {odenemeyenDuzeltme:N2} | Nakit iadesi: {nakitDuzeltmesi:N2}");
             }
             await KaydetAsync(cancellationToken);
         }
         finally { kilit.Release(); }
     }
 
-    private static decimal SürdürülebilirTickGideri(SirketKaydi sirket, SirketIsletimDurumu durum)
+    private static decimal SurdurulebilirTickGideri(SirketKaydi sirket, SirketIsletimDurumu durum)
     {
         int aktifHizmet = sirket.Hizmetler.Count(h => h.Aktif);
         int hizmetKapasitesi = sirket.Hizmetler.Where(h => h.Aktif).Sum(h => h.AzamiEszamanliIs);
