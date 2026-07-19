@@ -16,19 +16,37 @@ Bu dosya, Üç Kardeş Yazılım Şirketi Simülasyonu için okunması gereken t
 
 ### Motoru ve yeni ekosistemi çalıştıran kişi
 
-1. [TINGRAM_TMAIL_ILOS_TECH_8080_PAKETI.md](TINGRAM_TMAIL_ILOS_TECH_8080_PAKETI.md)
-2. [YAZILIM_BORSASI_V3_GUNCELLEME_REHBERI.md](YAZILIM_BORSASI_V3_GUNCELLEME_REHBERI.md)
-3. [SIRKET_ISLETIM_MERKEZI_8090_REHBERI.md](SIRKET_ISLETIM_MERKEZI_8090_REHBERI.md)
-4. [SIBER_SALDIRI_SAVUNMA_REHBERI.md](SIBER_SALDIRI_SAVUNMA_REHBERI.md)
-5. [UYGULAMA_MANIFESTI_V1.md](UYGULAMA_MANIFESTI_V1.md)
+1. [PANO_V4_1_10000_MUSTERI_REHBERI.md](PANO_V4_1_10000_MUSTERI_REHBERI.md)
+2. [TINGRAM_TMAIL_ILOS_TECH_8080_PAKETI.md](TINGRAM_TMAIL_ILOS_TECH_8080_PAKETI.md)
+3. [YAZILIM_BORSASI_V3_GUNCELLEME_REHBERI.md](YAZILIM_BORSASI_V3_GUNCELLEME_REHBERI.md)
+4. [SIRKET_ISLETIM_MERKEZI_8090_REHBERI.md](SIRKET_ISLETIM_MERKEZI_8090_REHBERI.md)
+5. [SIBER_SALDIRI_SAVUNMA_REHBERI.md](SIBER_SALDIRI_SAVUNMA_REHBERI.md)
+6. [UYGULAMA_MANIFESTI_V1.md](UYGULAMA_MANIFESTI_V1.md)
 
 ---
 
 ## Ana belgeler
 
+### [PANO_V4_1_10000_MUSTERI_REHBERI.md](PANO_V4_1_10000_MUSTERI_REHBERI.md)
+
+Son pano ve yoğun pazar paketinin ana rehberi:
+
+- 8090 kararlı form ve taslak sistemi
+- Otomatik yenilemede odak ve miktar koruması
+- Kimlik tabanlı güvenli buton işlemleri
+- 8080 TV odaklı `Ana Sayfa`
+- Bütün piyasa panolarının tek sayfada alt alta görünümü
+- Yaklaşık 450 ms 8080 canlı yenilemesi
+- Kasaya bağımlı olmayan şirket değerlemesi
+- 10.000 kalıcı müşteri
+- Tick başına yüksek ve çoklu hizmet talepleri
+- Rastgele pazar hareketleri
+- Tick başına 900 iş güvenli üst sınırı
+- Güncelleme ve test kontrol listesi
+
 ### [TINGRAM_TMAIL_ILOS_TECH_8080_PAKETI.md](TINGRAM_TMAIL_ILOS_TECH_8080_PAKETI.md)
 
-Son büyük ekosistem paketinin ana rehberi:
+Tunix ve İlos Tech ekosistem paketinin ana rehberi:
 
 - Gelişmiş 8080 şirket değeri ve piyasa ekranı
 - Uygulama/abonelik pazarı
@@ -42,13 +60,11 @@ Son büyük ekosistem paketinin ana rehberi:
 - Başlatma betiği
 - 8090 ticari yayın adımları
 - İlk açılış kontrol listesi
-- Mevcut teknik sınırlar
 
 ### [YAZILIM_BORSASI_V3_GUNCELLEME_REHBERI.md](YAZILIM_BORSASI_V3_GUNCELLEME_REHBERI.md)
 
 Bütün yeni oyun sistemlerinin genel özeti:
 
-- 5.000 müşteri
 - 10 temel hizmet
 - Kalite/performans/güvenlik puanları
 - Saldırı ekonomisi
@@ -59,6 +75,8 @@ Bütün yeni oyun sistemlerinin genel özeti:
 - Yatırım ve kredi
 - SLA sözleşmeleri
 - Kalıcı veri mimarisi
+
+Not: müşteri sayısı ve pano davranışı için daha yeni olan `PANO_V4_1_10000_MUSTERI_REHBERI.md` esas alınmalıdır.
 
 ### [SIBER_SALDIRI_SAVUNMA_REHBERI.md](SIBER_SALDIRI_SAVUNMA_REHBERI.md)
 
@@ -75,7 +93,7 @@ Bütün yeni oyun sistemlerinin genel özeti:
 
 ### [SIRKET_ISLETIM_MERKEZI_8090_REHBERI.md](SIRKET_ISLETIM_MERKEZI_8090_REHBERI.md)
 
-8090 şirket panelinin tam kullanım ve mimari rehberi:
+8090 şirket panelinin kullanım ve mimari rehberi:
 
 - Kodlama ile yönetim arasındaki kesin sınır
 - Giriş ve oturum
@@ -87,6 +105,8 @@ Bütün yeni oyun sistemlerinin genel özeti:
 - Banka ve kredi
 - SLA sözleşmeleri
 - HTTP uçları
+
+Panelin yenileme ve form koruma davranışında `PANO_V4_1_10000_MUSTERI_REHBERI.md` daha günceldir.
 
 ### [UYGULAMA_MANIFESTI_V1.md](UYGULAMA_MANIFESTI_V1.md)
 
@@ -128,8 +148,8 @@ Motorun bağımsız doğruladığı 10 temel hizmetin kesin teknik sözleşmeler
 | 7002 | Mudaf | Go şirket sunucusu |
 | 7003 | Ugax | Node.js şirket sunucusu |
 | 7004 | İlos Tech | Python şirket sunucusu |
-| 8080 | Yazılım Borsası | Şirket değeri, uygulamalar, abonelikler, protokoller ve piyasa |
-| 8090 | Şirket İşletim Merkezi | Finansal ve ticari yönetim |
+| 8080 | Yazılım Borsası | TV ana sayfası, şirket değeri, uygulamalar, abonelikler, protokoller ve piyasa |
+| 8090 | Şirket İşletim Merkezi | Finansal ve ticari yönetim; kararlı formlar |
 
 ---
 
@@ -149,21 +169,23 @@ Motor teknik sonucu ve piyasa davranışını doğrular.
 
 ```powershell
 git pull --ff-only origin agent/tunix-matematik-topla
+dotnet build .\SirketMotoru\SirketMotoru.csproj
 powershell -ExecutionPolicy Bypass -File .\BASLAT_TUNIX_ILOS_BORSA.ps1
 ```
 
-Elle kontrol için:
+Elle şirket testleri:
 
 ```powershell
-dotnet build .\SirketMotoru\SirketMotoru.csproj
 cd .\Sirketler\Tunahan-Rustix\Tunix
 cargo test
 cd ..\..\Ilayda-Python\IlosTech
 python -m unittest -v
 ```
 
+Tarayıcıda eski panel görünürse 8080 ve 8090 sayfalarında bir kez `Ctrl+F5` kullanın.
+
 ---
 
 ## Belge bakım kuralı
 
-Motor protokolü, hizmet şeması, uygulama standardı, saldırı davranışı, 8080 API'si veya 8090 uçları değiştiğinde ilgili belge aynı commit serisinde güncellenmelidir. Kod ile doküman birbiriyle çelişmemelidir.
+Motor protokolü, hizmet şeması, uygulama standardı, saldırı davranışı, müşteri yoğunluğu, 8080 ekranı veya 8090 uçları değiştiğinde ilgili belge aynı commit serisinde güncellenmelidir. Kod ile doküman birbiriyle çelişmemelidir.
