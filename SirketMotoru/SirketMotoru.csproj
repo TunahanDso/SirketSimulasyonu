@@ -10,6 +10,7 @@
   <ItemGroup>
     <!-- Yeni kararlı sürümler aynı sınıf adlarını kullanır. -->
     <Compile Remove="CanliPano/YazilimBorsasiHtml.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV2.cs" />
     <Compile Remove="Isletim/SirketYonetimHtml.cs" />
     <Compile Remove="Musteriler/MusteriYoneticisi.cs" />
   </ItemGroup>
