@@ -6,6 +6,7 @@ mod metin_frekans_analizi;
 mod metin_karakter_say;
 mod metin_kelime_say;
 mod platform_release;
+mod tunix_genis;
 mod tunix_os;
 mod veri_medyan_hesapla;
 mod veri_ortalama_hesapla;
@@ -83,10 +84,12 @@ pub fn hizmeti_calistir(
         ("eposta.ek-yukle", "1.0") => platform_release::calistir("tunix.tmail.ek-yukle", istek_verisi_json),
         ("eposta.klasor-olustur", "1.0") => platform_release::calistir("tunix.tmail.klasor", istek_verisi_json),
 
-        // Tlink de katalogdaki standart yetkinlikleri uygular.
         ("kimlik.token-dogrula", "1.0") => platform_release::calistir("tunix.tlink.kimlik", istek_verisi_json),
         ("dosya.sikistir", "1.0") => platform_release::calistir("tunix.tlink.paketle", istek_verisi_json),
         ("guvenlik.baglanti-dogrula", "1.0") => platform_release::calistir("tunix.tlink.dogrula", istek_verisi_json),
+
+        (kimlik, "1.0") if tunix_genis::destekli(kimlik) =>
+            tunix_genis::calistir(kimlik, istek_verisi_json),
 
         (kimlik, "1.0") if kimlik.starts_with("isletim.")
             || kimlik == "kimlik.kullanici-dogrula"
