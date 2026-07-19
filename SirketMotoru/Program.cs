@@ -40,7 +40,6 @@ try
 
     string musteriDosyasiYolu = Path.Combine(motorVerileriKlasoru, "musteriler.json");
     MusteriVeritabani musteriVeritabani = new(musteriDosyasiYolu);
-    // Mevcut müşteri geçmişi korunur; eksik kayıtlar 20.000'e kadar eklenir.
     await musteriVeritabani.YukleVeyaOlusturAsync(20_000, iptalKaynagi.Token);
     await using MusteriYoneticisi musteriYoneticisi = new(musteriVeritabani, hizmetKatalogu);
     await musteriYoneticisi.BaslatAsync(iptalKaynagi.Token);
@@ -54,6 +53,8 @@ try
     await isletimYoneticisi.BaslatAsync(iptalKaynagi.Token);
     await using EkosistemYoneticisi ekosistemYoneticisi = new(sirketYoneticisi, isletimYoneticisi, motorVerileriKlasoru);
     await ekosistemYoneticisi.BaslatAsync(iptalKaynagi.Token);
+    await using PazarFiyatYoneticisi pazarFiyatYoneticisi = new(isletimYoneticisi, sirketYoneticisi, motorVerileriKlasoru);
+    await pazarFiyatYoneticisi.BaslatAsync(iptalKaynagi.Token);
 
     await BaslangicMigrasyonlari.TekSeferlikFinansmanDestekleriniUygulaAsync(sirketYoneticisi, motorVerileriKlasoru, iptalKaynagi.Token);
 
@@ -63,7 +64,8 @@ try
         musteriYoneticisi,
         musteriIsletimSistemiYoneticisi,
         isletimYoneticisi,
-        ekosistemYoneticisi);
+        ekosistemYoneticisi,
+        pazarFiyatYoneticisi);
 
     await using YazilimBorsasiSunucusu yazilimBorsasiSunucusu = new(
         motorAyarlari,
