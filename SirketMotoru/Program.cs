@@ -43,7 +43,7 @@ try
     HizmetKatalogAyarlari katalogAyarlari = StandartKatalogV6.Genislet(tohumKatalog);
     HizmetKatalogu hizmetKatalogu = new(katalogAyarlari);
     KonsolKayitcisi.Basari(
-        $"V8.1 hizmet kataloğu yüklendi | Sürüm: {hizmetKatalogu.KatalogSurumu} | " +
+        $"V8.2 hizmet kataloğu yüklendi | Sürüm: {hizmetKatalogu.KatalogSurumu} | " +
         $"Aktif: {hizmetKatalogu.Hizmetler.Count(h => h.Aktif)} | " +
         $"Uygulama kategorisi: {StandartKatalogV6.UygulamaKategorileri.Count}");
 
@@ -74,7 +74,7 @@ try
     CezaV8Deposu.Baslat(motorVerileriKlasoru);
     CezaV8Deposu.LegacyCezalariUzlastir(sirketYoneticisi.SirketKayitlari);
     KonsolKayitcisi.Basari(
-        "Adil Ceza V8.1 hazır | Motor sözleşme kusurları ayrıştırılır, tick cezası sınırlıdır.");
+        "Adil Ceza V8.2 hazır | Motor istek sözleşmesi kusurları şirkete ceza yazmaz.");
     await BaslangicMigrasyonlari.YonetimHesaplariniHazirlaAsync(
         motorVerileriKlasoru,
         iptalKaynagi.Token);
@@ -150,6 +150,14 @@ try
     await yazilimBorsasiSunucusu.BaslatAsync(iptalKaynagi.Token);
     await sirketYonetimSunucusu.BaslatAsync(iptalKaynagi.Token);
     await sirketYoneticisi.IlkBaglantilariKurAsync(iptalKaynagi.Token);
+
+    await MotorHizmetFiyatlari.KaliciEzmeKayitlariniTemizleVeUygulaAsync(
+        isletimYoneticisi,
+        sirketYoneticisi.SirketKayitlari,
+        iptalKaynagi.Token);
+    KonsolKayitcisi.Basari(
+        "V8.2 sabit hizmet fiyatları uygulandı | Eski 8090 fiyat ezmeleri temizlendi.");
+
     await tickYoneticisi.BaslatAsync(iptalKaynagi.Token);
 }
 catch (OperationCanceledException)
