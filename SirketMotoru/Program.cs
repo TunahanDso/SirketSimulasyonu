@@ -53,6 +53,8 @@ try
     await isletimYoneticisi.BaslatAsync(iptalKaynagi.Token);
     await using EkosistemYoneticisi ekosistemYoneticisi = new(sirketYoneticisi, isletimYoneticisi, motorVerileriKlasoru);
     await ekosistemYoneticisi.BaslatAsync(iptalKaynagi.Token);
+
+    PazarFiyatOzTesti.Dogrula();
     await using PazarFiyatYoneticisi pazarFiyatYoneticisi = new(isletimYoneticisi, sirketYoneticisi, motorVerileriKlasoru);
     await pazarFiyatYoneticisi.BaslatAsync(iptalKaynagi.Token);
 
