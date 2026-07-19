@@ -1,5 +1,6 @@
 mod protocol;
 mod services;
+mod v6_manifest;
 
 use std::collections::{HashSet, VecDeque};
 use std::io::{self, BufRead, BufReader, BufWriter, ErrorKind, Write};
@@ -19,11 +20,6 @@ use protocol::{
     PLATFORM_SURUMU, PROTOKOL_SURUMU, ProtokolYetkinligi, SIRKET_ADI,
     SIRKET_KIMLIGI, SUNUCU_SURUMU, SaglikKontroluMesaji, SaglikSonucuMesaji,
     SirketTanitimMesaji, SunulanHizmet, SunulanOzelProtokol, SunulanUygulama,
-    TINGRAM_AKISI_GETIR, TINGRAM_ARAMA, TINGRAM_ETKILESIM,
-    TINGRAM_GONDERI_OLUSTUR, TINGRAM_PROFIL_GETIR, TINGRAM_YORUM,
-    TLINK_DOGRULA, TLINK_KIMLIK, TLINK_PAKETLE, TMAIL_ARA, TMAIL_EK_YUKLE,
-    TMAIL_GELEN_KUTUSU, TMAIL_GONDER, TMAIL_KLASOR, TMAIL_SPAM_KONTROL,
-    TUNIX_KIMLIK_DOGRULA, UygulamaBagimliligi, UygulamaOzelligi,
     VERI_MEDYAN_HESAPLA, VERI_MEDYAN_HESAPLA_SURUMU, VERI_ORTALAMA_HESAPLA,
     VERI_ORTALAMA_HESAPLA_SURUMU, VERI_STANDART_SAPMA,
     VERI_STANDART_SAPMA_SURUMU,
@@ -49,7 +45,7 @@ struct TekrarCache {
 
 fn main() -> io::Result<()> {
     println!("========================================================");
-    println!("TUNIX SERVER · TINGRAM · TMAIL · TLINK");
+    println!("TUNIX OS · TINGRAM · TMAIL · TLINK");
     println!("========================================================");
     println!("Sunucu sürümü: {SUNUCU_SURUMU}");
     println!("Adres: {SUNUCU_ADRESI}");
@@ -77,7 +73,7 @@ fn main() -> io::Result<()> {
 }
 
 fn sunulan_hizmetler() -> Vec<SunulanHizmet> {
-    vec![
+    let mut hizmetler = vec![
         hizmet(MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU, 5, 2),
         hizmet(MATEMATIK_CARP, MATEMATIK_CARP_SURUMU, 8, 2),
         hizmet(VERI_ORTALAMA_HESAPLA, VERI_ORTALAMA_HESAPLA_SURUMU, 15, 2),
@@ -88,23 +84,16 @@ fn sunulan_hizmetler() -> Vec<SunulanHizmet> {
         hizmet(DIZI_SIRALA, DIZI_SIRALA_SURUMU, 28, 2),
         hizmet(MATEMATIK_ASAL_CARPANLAR, MATEMATIK_ASAL_CARPANLAR_SURUMU, 45, 2),
         hizmet(METIN_FREKANS_ANALIZI, METIN_FREKANS_ANALIZI_SURUMU, 32, 2),
-        hizmet(TUNIX_KIMLIK_DOGRULA, PLATFORM_SURUMU, 3, 12),
-        hizmet(TINGRAM_PROFIL_GETIR, PLATFORM_SURUMU, 5, 10),
-        hizmet(TINGRAM_GONDERI_OLUSTUR, PLATFORM_SURUMU, 7, 8),
-        hizmet(TINGRAM_AKISI_GETIR, PLATFORM_SURUMU, 6, 10),
-        hizmet(TINGRAM_ETKILESIM, PLATFORM_SURUMU, 4, 12),
-        hizmet(TINGRAM_YORUM, PLATFORM_SURUMU, 4, 10),
-        hizmet(TINGRAM_ARAMA, PLATFORM_SURUMU, 6, 8),
-        hizmet(TMAIL_GONDER, PLATFORM_SURUMU, 7, 10),
-        hizmet(TMAIL_GELEN_KUTUSU, PLATFORM_SURUMU, 5, 12),
-        hizmet(TMAIL_ARA, PLATFORM_SURUMU, 6, 10),
-        hizmet(TMAIL_SPAM_KONTROL, PLATFORM_SURUMU, 4, 14),
-        hizmet(TMAIL_EK_YUKLE, PLATFORM_SURUMU, 6, 8),
-        hizmet(TMAIL_KLASOR, PLATFORM_SURUMU, 3, 14),
-        hizmet(TLINK_KIMLIK, PLATFORM_SURUMU, 3, 16),
-        hizmet(TLINK_PAKETLE, PLATFORM_SURUMU, 4, 16),
-        hizmet(TLINK_DOGRULA, PLATFORM_SURUMU, 3, 16),
-    ]
+    ];
+    hizmetler.extend(v6_manifest::standart_hizmetler());
+    // Tlink yetkinlikleri de motorun standart hizmet kataloğundadır.
+    hizmetler.push(hizmet("kimlik.token-dogrula", PLATFORM_SURUMU, 3, 20));
+    hizmetler.push(hizmet("dosya.sikistir", PLATFORM_SURUMU, 4, 18));
+    hizmetler.push(hizmet("guvenlik.baglanti-dogrula", PLATFORM_SURUMU, 3, 20));
+
+    let mut gorulen = HashSet::new();
+    hizmetler.retain(|h| gorulen.insert((h.hizmet_kimligi, h.hizmet_surumu)));
+    hizmetler
 }
 
 fn hizmet(
@@ -123,64 +112,7 @@ fn hizmet(
 }
 
 fn sunulan_uygulamalar() -> Vec<SunulanUygulama> {
-    vec![
-        SunulanUygulama {
-            uygulama_kimligi: "tunix-tingram",
-            uygulama_adi: "Tingram",
-            surum: "1.0",
-            kategori: "sosyal-medya",
-            aciklama: "Tunix tarafından Rust ile geliştirilen sosyal medya platformu.",
-            ozellikler: vec![
-                ozellik("kimlik.dogrula", TUNIX_KIMLIK_DOGRULA, true),
-                ozellik("sosyal.profil.getir", TINGRAM_PROFIL_GETIR, true),
-                ozellik("sosyal.gonderi.olustur", TINGRAM_GONDERI_OLUSTUR, true),
-                ozellik("sosyal.akisi.getir", TINGRAM_AKISI_GETIR, true),
-                ozellik("sosyal.etkilesim", TINGRAM_ETKILESIM, true),
-                ozellik("sosyal.yorum", TINGRAM_YORUM, false),
-                ozellik("sosyal.arama", TINGRAM_ARAMA, false),
-            ],
-            bagimliliklar: vec![UygulamaBagimliligi {
-                sirket_kimligi: SIRKET_KIMLIGI,
-                uygulama_kimligi: "tunix-tmail",
-                asgari_surum: "1.0",
-                protokol_kimligi: "tunix-tlink",
-                zorunlu: false,
-            }],
-            desteklenen_protokoller: vec!["tunix-tlink"],
-        },
-        SunulanUygulama {
-            uygulama_kimligi: "tunix-tmail",
-            uygulama_adi: "Tmail",
-            surum: "1.0",
-            kategori: "eposta",
-            aciklama: "Tunix tarafından Rust ile geliştirilen spam korumalı e-posta platformu.",
-            ozellikler: vec![
-                ozellik("kimlik.dogrula", TUNIX_KIMLIK_DOGRULA, true),
-                ozellik("eposta.gonder", TMAIL_GONDER, true),
-                ozellik("eposta.gelen-kutusu", TMAIL_GELEN_KUTUSU, true),
-                ozellik("eposta.ara", TMAIL_ARA, true),
-                ozellik("eposta.spam-kontrol", TMAIL_SPAM_KONTROL, true),
-                ozellik("eposta.ek-yukle", TMAIL_EK_YUKLE, false),
-                ozellik("eposta.klasor", TMAIL_KLASOR, false),
-            ],
-            bagimliliklar: vec![],
-            desteklenen_protokoller: vec!["tunix-tlink"],
-        },
-    ]
-}
-
-fn ozellik(
-    ozellik_kimligi: &'static str,
-    hizmet_kimligi: &'static str,
-    zorunlu: bool,
-) -> UygulamaOzelligi {
-    UygulamaOzelligi {
-        ozellik_kimligi,
-        hizmet_kimligi,
-        hizmet_surumu: PLATFORM_SURUMU,
-        aciklama: "Çalışan Tunix hizmetine bağlı uygulama özelliği.",
-        zorunlu,
-    }
+    v6_manifest::uygulamalar()
 }
 
 fn sunulan_protokoller() -> Vec<SunulanOzelProtokol> {
@@ -188,13 +120,13 @@ fn sunulan_protokoller() -> Vec<SunulanOzelProtokol> {
         protokol_kimligi: "tunix-tlink",
         protokol_adi: "Tlink",
         surum: "1.0",
-        aciklama: "Tunix uygulamaları ve şirketler arası sürümlü veri zarfı protokolü.",
+        aciklama: "Tunix OS, uygulamalar ve şirketler arası sürümlü veri zarfı protokolü.",
         sema_kimligi: "tlink-json-envelope-v1",
         sema_ozeti: "protokol, sürüm, kaynak, hedef, veri ve bütünlük alanları",
         yetkinlikler: vec![
-            protokol_yetkinligi("kimlik", TLINK_KIMLIK),
-            protokol_yetkinligi("paketle", TLINK_PAKETLE),
-            protokol_yetkinligi("dogrula", TLINK_DOGRULA),
+            protokol_yetkinligi("kimlik", "kimlik.token-dogrula"),
+            protokol_yetkinligi("paketle", "dosya.sikistir"),
+            protokol_yetkinligi("dogrula", "guvenlik.baglanti-dogrula"),
         ],
         uyumlu_protokoller: vec!["ilos-ilink"],
     }]
@@ -208,7 +140,7 @@ fn protokol_yetkinligi(
         yetkinlik_kimligi: kimlik,
         hizmet_kimligi: hizmet,
         hizmet_surumu: PLATFORM_SURUMU,
-        aciklama: "Çalışan Tlink protokol yetkinliği.",
+        aciklama: "Motor V6 standart hizmetine bağlı çalışan Tlink yetkinliği.",
     }
 }
 
