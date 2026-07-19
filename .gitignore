@@ -26,6 +26,14 @@ Desktop.ini
 *.log
 
 # Motor çalışma verileri
+# Bu dosyalar oyunun kalıcı durumudur. Git pull/stash sırasında taşınmamalıdır.
 MotorVerileri/musteriler.json
+MotorVerileri/musteriler.json.tmp
 MotorVerileri/sirket-bilancolari.json
 MotorVerileri/sirket-bilancolari.json.tmp
+MotorVerileri/sirket-isletim.json
+MotorVerileri/sirket-isletim.json.tmp
+MotorVerileri/kod-tabanli-yayinlar.json
+MotorVerileri/kod-tabanli-yayinlar.json.tmp
+MotorVerileri/tek-seferlik-destekler.json
+MotorVerileri/tek-seferlik-destekler.json.tmp
