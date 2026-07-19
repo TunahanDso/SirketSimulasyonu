@@ -58,15 +58,17 @@ try
 
     await using SirketYoneticisi sirketYoneticisi = new(motorAyarlari, hizmetKatalogu);
 
-    // Bütün eski finansal/operasyonel geçmiş temizlenir; hizmet ve uygulama tanımları korunur.
     await V81SezonMigrasyonu.UygulaAsync(
         motorAyarlari,
         sirketYoneticisi,
         musteriVeritabani,
         motorVerileriKlasoru,
         iptalKaynagi.Token);
+    await V81AdilBaslangicDengeleyicisi.UygulaAsync(
+        sirketYoneticisi,
+        motorVerileriKlasoru,
+        iptalKaynagi.Token);
 
-    // Tick numarası finans dosyasından değil, yalnız başarıyla tamamlanan ticklerden okunur.
     await TickSaatDeposu.BaslatAsync(motorVerileriKlasoru, iptalKaynagi.Token);
 
     CezaV8Deposu.Baslat(motorVerileriKlasoru);
@@ -115,7 +117,6 @@ try
         motorVerileriKlasoru);
     await finansV7Yoneticisi.BaslatAsync(iptalKaynagi.Token);
 
-    // Eski özel finansman desteği temiz sezonun başlangıç kasasını bozmaması için tekrar uygulanmaz.
     TickYoneticisi tickYoneticisi = new(
         motorAyarlari,
         sirketYoneticisi,
