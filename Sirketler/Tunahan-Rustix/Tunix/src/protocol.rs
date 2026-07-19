@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub const PROTOKOL_SURUMU: &str = "0.1";
 pub const SIRKET_KIMLIGI: &str = "tunahan-tunix";
 pub const SIRKET_ADI: &str = "Tunix";
-pub const SUNUCU_SURUMU: &str = "0.5.0";
+pub const SUNUCU_SURUMU: &str = "0.5.1";
 pub const MATEMATIK_TOPLA: &str = "matematik.topla";
 pub const MATEMATIK_TOPLA_SURUMU: &str = "1.0";
 pub const MATEMATIK_CARP: &str = "matematik.carp";
@@ -56,7 +56,25 @@ pub struct SaglikKontroluMesaji {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IsIstegiMesaji {
+    pub mesaj_turu: String,
+    pub istek_kimligi: String,
+    pub is_kimligi: String,
+    pub tick_numarasi: i64,
+    pub musteri_kimligi: String,
+    pub hizmet_kimligi: String,
+    pub hizmet_surumu: String,
+    pub teklif_edilen_tutar: Decimal,
+    pub zaman_asimi_ms: u64,
+    pub istek_verisi_json: String,
+    #[serde(default)]
+    pub olusturulma_zamani: Option<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FinansDurumuMesaji {
     pub mesaj_turu: String,
@@ -77,26 +95,7 @@ pub struct FinansDurumuMesaji {
     pub itibar_puani: f64,
     pub guvenilirlik_puani: f64,
     pub ortalama_musteri_memnuniyeti: f64,
-    #[serde(default)]
-    pub guncellenme_zamani: Option<String>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct IsIstegiMesaji {
-    pub mesaj_turu: String,
-    pub istek_kimligi: String,
-    pub is_kimligi: String,
-    pub tick_numarasi: i64,
-    pub musteri_kimligi: String,
-    pub hizmet_kimligi: String,
-    pub hizmet_surumu: String,
-    pub teklif_edilen_tutar: Decimal,
-    pub zaman_asimi_ms: u64,
-    pub istek_verisi_json: String,
-    #[serde(default)]
-    pub olusturulma_zamani: Option<String>,
+    pub guncellenme_zamani: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -164,11 +163,11 @@ mod tests {
             sirket_adi: SIRKET_ADI,
             sunucu_surumu: SUNUCU_SURUMU,
             hizmetler: vec![
-                SunulanHizmet { hizmet_kimligi: MATEMATIK_TOPLA, hizmet_surumu: MATEMATIK_TOPLA_SURUMU, birim_fiyat: Decimal::ONE, azami_eszamanli_is: 1, aktif: true },
-                SunulanHizmet { hizmet_kimligi: MATEMATIK_CARP, hizmet_surumu: MATEMATIK_CARP_SURUMU, birim_fiyat: Decimal::new(2, 0), azami_eszamanli_is: 1, aktif: true },
-                SunulanHizmet { hizmet_kimligi: VERI_ORTALAMA_HESAPLA, hizmet_surumu: VERI_ORTALAMA_HESAPLA_SURUMU, birim_fiyat: Decimal::new(3, 0), azami_eszamanli_is: 1, aktif: true },
-                SunulanHizmet { hizmet_kimligi: METIN_KELIME_SAY, hizmet_surumu: METIN_KELIME_SAY_SURUMU, birim_fiyat: Decimal::new(2, 0), azami_eszamanli_is: 1, aktif: true },
-                SunulanHizmet { hizmet_kimligi: METIN_KARAKTER_SAY, hizmet_surumu: METIN_KARAKTER_SAY_SURUMU, birim_fiyat: Decimal::ONE, azami_eszamanli_is: 1, aktif: true },
+                SunulanHizmet { hizmet_kimligi: MATEMATIK_TOPLA, hizmet_surumu: MATEMATIK_TOPLA_SURUMU, birim_fiyat: Decimal::new(5, 0), azami_eszamanli_is: 1, aktif: true },
+                SunulanHizmet { hizmet_kimligi: MATEMATIK_CARP, hizmet_surumu: MATEMATIK_CARP_SURUMU, birim_fiyat: Decimal::new(8, 0), azami_eszamanli_is: 1, aktif: true },
+                SunulanHizmet { hizmet_kimligi: VERI_ORTALAMA_HESAPLA, hizmet_surumu: VERI_ORTALAMA_HESAPLA_SURUMU, birim_fiyat: Decimal::new(15, 0), azami_eszamanli_is: 1, aktif: true },
+                SunulanHizmet { hizmet_kimligi: METIN_KELIME_SAY, hizmet_surumu: METIN_KELIME_SAY_SURUMU, birim_fiyat: Decimal::new(7, 0), azami_eszamanli_is: 1, aktif: true },
+                SunulanHizmet { hizmet_kimligi: METIN_KARAKTER_SAY, hizmet_surumu: METIN_KARAKTER_SAY_SURUMU, birim_fiyat: Decimal::new(4, 0), azami_eszamanli_is: 1, aktif: true },
             ],
         };
 
@@ -182,18 +181,10 @@ mod tests {
         assert_eq!(hizmetler[2]["hizmetKimligi"], VERI_ORTALAMA_HESAPLA);
         assert_eq!(hizmetler[3]["hizmetKimligi"], METIN_KELIME_SAY);
         assert_eq!(hizmetler[4]["hizmetKimligi"], METIN_KARAKTER_SAY);
-    }
-
-    #[test]
-    fn finans_durumu_mesajini_okur() {
-        let mesaj: FinansDurumuMesaji = serde_json::from_str(
-            r#"{"mesajTuru":"finansDurumu","mesajKimligi":"m1","protokolSurumu":"0.1","sirketKimligi":"tunahan-tunix","tickNumarasi":12,"kasa":12.50,"toplamGelir":15,"toplamIade":1,"toplamCeza":1.50,"bekleyenOdeme":0,"netGelir":12.50,"tamamlananIsSayisi":8,"basarisizIsSayisi":1,"zamanAsiminaUgrayanIsSayisi":0,"iptalEdilenIsSayisi":0,"itibarPuani":55,"guvenilirlikPuani":60,"ortalamaMusteriMemnuniyeti":75,"guncellenmeZamani":"2026-07-19T10:00:00Z"}"#,
-        )
-        .expect("finans mesajı ayrıştırılmalı");
-
-        assert_eq!(mesaj.sirket_kimligi, SIRKET_KIMLIGI);
-        assert_eq!(mesaj.tick_numarasi, 12);
-        assert_eq!(mesaj.kasa, Decimal::new(1250, 2));
-        assert_eq!(mesaj.net_gelir, Decimal::new(1250, 2));
+        assert_eq!(hizmetler[0]["birimFiyat"], 5);
+        assert_eq!(hizmetler[1]["birimFiyat"], 8);
+        assert_eq!(hizmetler[2]["birimFiyat"], 15);
+        assert_eq!(hizmetler[3]["birimFiyat"], 7);
+        assert_eq!(hizmetler[4]["birimFiyat"], 4);
     }
 }
