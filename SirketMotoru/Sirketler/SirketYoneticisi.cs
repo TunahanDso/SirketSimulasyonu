@@ -35,24 +35,37 @@ public sealed class SirketYoneticisi : IAsyncDisposable
 
         IReadOnlyDictionary<string, SirketBilancoKaydi> kaliciBilancolar =
             _bilancoVeritabani.Yukle();
+        Dictionary<string, SirketBaglantiAyari> ayarIndeksi =
+            motorAyarlari.Sirketler.ToDictionary(
+                ayar => ayar.SirketKimligi,
+                StringComparer.OrdinalIgnoreCase);
         int yuklenenBilancoSayisi = 0;
+        int baslangicProfiliSayisi = 0;
 
         foreach (SirketBaglantisi baglanti in _baglantilar)
         {
-            if (!kaliciBilancolar.TryGetValue(
+            if (kaliciBilancolar.TryGetValue(
                     baglanti.Kayit.SirketKimligi,
                     out SirketBilancoKaydi? bilanco))
             {
+                bilanco.Uygula(baglanti.Kayit);
+                yuklenenBilancoSayisi++;
                 continue;
             }
 
-            bilanco.Uygula(baglanti.Kayit);
-            yuklenenBilancoSayisi++;
+            if (ayarIndeksi.TryGetValue(
+                    baglanti.Kayit.SirketKimligi,
+                    out SirketBaglantiAyari? ayar))
+            {
+                BaslangicProfiliniUygula(baglanti.Kayit, ayar);
+                baslangicProfiliSayisi++;
+            }
         }
 
         KonsolKayitcisi.Bilgi(
             $"Şirket bilanço veritabanı: {_bilancoVeritabani.DosyaYolu} | " +
-            $"Yüklenen kayıt: {yuklenenBilancoSayisi}");
+            $"Yüklenen kayıt: {yuklenenBilancoSayisi} | " +
+            $"Yeni başlangıç profili: {baslangicProfiliSayisi}");
     }
 
     public IReadOnlyList<SirketBaglantisi> BaglantilariGetir()
@@ -188,6 +201,45 @@ public sealed class SirketYoneticisi : IAsyncDisposable
                 hizmetKimligi,
                 hizmetSurumu)
             .FirstOrDefault();
+    }
+
+    private static void BaslangicProfiliniUygula(
+        SirketKaydi kayit,
+        SirketBaglantiAyari ayar)
+    {
+        kayit.Kasa = Math.Max(0, ayar.BaslangicKasasi);
+        kayit.ItibarPuani = BaslangicPuani(
+            ayar.BaslangicItibarPuani,
+            kayit.ItibarPuani);
+        kayit.GuvenilirlikPuani = BaslangicPuani(
+            ayar.BaslangicGuvenilirlikPuani,
+            kayit.GuvenilirlikPuani);
+        kayit.KodKalitesiPuani = BaslangicPuani(
+            ayar.BaslangicKodKalitesiPuani,
+            kayit.KodKalitesiPuani);
+        kayit.PerformansPuani = BaslangicPuani(
+            ayar.BaslangicPerformansPuani,
+            kayit.PerformansPuani);
+        kayit.GuvenlikPuani = BaslangicPuani(
+            ayar.BaslangicGuvenlikPuani,
+            kayit.GuvenlikPuani);
+        kayit.OrtalamaMusteriMemnuniyeti = BaslangicPuani(
+            ayar.BaslangicMusteriMemnuniyeti,
+            kayit.OrtalamaMusteriMemnuniyeti);
+    }
+
+    private static double BaslangicPuani(
+        double? ayarDegeri,
+        double varsayilanDeger)
+    {
+        if (!ayarDegeri.HasValue ||
+            double.IsNaN(ayarDegeri.Value) ||
+            double.IsInfinity(ayarDegeri.Value))
+        {
+            return varsayilanDeger;
+        }
+
+        return Math.Clamp(ayarDegeri.Value, 0, 100);
     }
 
     private async Task FinansDurumunuGuvenliGonderAsync(
