@@ -8,10 +8,16 @@ public sealed class SunulanUygulama
     public string UygulamaAdi { get; init; } = string.Empty;
     public string Surum { get; init; } = "1.0";
     public string Kategori { get; init; } = "diger";
+    public string UrunTuru { get; init; } = "uygulama";
+    public string DagitimModeli { get; init; } = "sunucu";
     public string Aciklama { get; init; } = string.Empty;
     public List<UygulamaOzelligi> Ozellikler { get; init; } = [];
     public List<UygulamaBagimliligi> Bagimliliklar { get; init; } = [];
     public List<string> DesteklenenProtokoller { get; init; } = [];
+    public List<string> DesteklenenPlatformlar { get; init; } = [];
+    public List<string> GerekliPlatformlar { get; init; } = [];
+    public List<string> Mimariler { get; init; } = [];
+    public List<string> Etiketler { get; init; } = [];
 }
 
 public sealed class UygulamaOzelligi
@@ -29,6 +35,7 @@ public sealed class UygulamaBagimliligi
     public string UygulamaKimligi { get; init; } = string.Empty;
     public string AsgariSurum { get; init; } = "1.0";
     public string ProtokolKimligi { get; init; } = string.Empty;
+    public string BagimlilikTuru { get; init; } = "uygulama";
     public bool Zorunlu { get; init; } = true;
 }
 
@@ -62,20 +69,13 @@ public sealed class SunucuYayinManifesti
 
 public static class SunucuYayinManifestDeposu
 {
-    private static readonly ConcurrentDictionary<string, SunucuYayinManifesti>
-        Manifestler = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, SunucuYayinManifesti> Manifestler =
+        new(StringComparer.OrdinalIgnoreCase);
 
-    public static void Guncelle(
-        string sirketKimligi,
-        IEnumerable<SunulanUygulama>? uygulamalar,
-        IEnumerable<SunulanOzelProtokol>? protokoller)
+    public static void Guncelle(string sirketKimligi, IEnumerable<SunulanUygulama>? uygulamalar, IEnumerable<SunulanOzelProtokol>? protokoller)
     {
         string kimlik = TemizMetin(sirketKimligi, 100);
-        if (string.IsNullOrWhiteSpace(kimlik))
-        {
-            return;
-        }
-
+        if (string.IsNullOrWhiteSpace(kimlik)) return;
         Manifestler[kimlik] = new SunucuYayinManifesti
         {
             SirketKimligi = kimlik,
@@ -87,72 +87,48 @@ public static class SunucuYayinManifestDeposu
 
     public static SunucuYayinManifesti Getir(string sirketKimligi)
     {
-        if (!string.IsNullOrWhiteSpace(sirketKimligi) &&
-            Manifestler.TryGetValue(sirketKimligi, out SunucuYayinManifesti? manifest))
-        {
-            return manifest;
-        }
-
-        return new SunucuYayinManifesti
-        {
-            SirketKimligi = sirketKimligi?.Trim() ?? string.Empty
-        };
+        if (!string.IsNullOrWhiteSpace(sirketKimligi) && Manifestler.TryGetValue(sirketKimligi, out SunucuYayinManifesti? manifest)) return manifest;
+        return new SunucuYayinManifesti { SirketKimligi = sirketKimligi?.Trim() ?? string.Empty };
     }
 
-    public static IReadOnlyCollection<SunucuYayinManifesti> TumunuGetir() =>
-        Manifestler.Values.ToList().AsReadOnly();
+    public static IReadOnlyCollection<SunucuYayinManifesti> TumunuGetir() => Manifestler.Values.ToList().AsReadOnly();
 
-    private static IReadOnlyList<SunulanUygulama> TemizUygulamalar(
-        IEnumerable<SunulanUygulama>? uygulamalar)
+    private static IReadOnlyList<SunulanUygulama> TemizUygulamalar(IEnumerable<SunulanUygulama>? uygulamalar)
     {
-        Dictionary<string, SunulanUygulama> sonuc =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        foreach (SunulanUygulama uygulama in (uygulamalar ?? []).Take(50))
+        Dictionary<string, SunulanUygulama> sonuc = new(StringComparer.OrdinalIgnoreCase);
+        foreach (SunulanUygulama uygulama in (uygulamalar ?? []).Take(100))
         {
             string kimlik = TemizMetin(uygulama.UygulamaKimligi, 120);
             string ad = TemizMetin(uygulama.UygulamaAdi, 100);
             string surum = TemizMetin(uygulama.Surum, 30);
-            string kategori = TemizMetin(uygulama.Kategori, 50).ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(kimlik) || string.IsNullOrWhiteSpace(ad) || string.IsNullOrWhiteSpace(surum)) continue;
 
-            if (string.IsNullOrWhiteSpace(kimlik) ||
-                string.IsNullOrWhiteSpace(ad) ||
-                string.IsNullOrWhiteSpace(surum))
-            {
-                continue;
-            }
+            List<UygulamaOzelligi> ozellikler = (uygulama.Ozellikler ?? [])
+                .Take(200)
+                .Select(o => new UygulamaOzelligi
+                {
+                    OzellikKimligi = TemizMetin(o.OzellikKimligi, 120),
+                    HizmetKimligi = TemizMetin(o.HizmetKimligi, 160),
+                    HizmetSurumu = TemizMetin(o.HizmetSurumu, 30),
+                    Aciklama = TemizMetin(o.Aciklama, 400),
+                    Zorunlu = o.Zorunlu
+                })
+                .Where(o => !string.IsNullOrWhiteSpace(o.OzellikKimligi) && !string.IsNullOrWhiteSpace(o.HizmetKimligi) && !string.IsNullOrWhiteSpace(o.HizmetSurumu))
+                .GroupBy(o => o.OzellikKimligi, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.Last()).ToList();
 
-            List<UygulamaOzelligi> ozellikler = uygulama.Ozellikler
+            List<UygulamaBagimliligi> bagimliliklar = (uygulama.Bagimliliklar ?? [])
                 .Take(100)
-                .Select(ozellik => new UygulamaOzelligi
+                .Select(b => new UygulamaBagimliligi
                 {
-                    OzellikKimligi = TemizMetin(ozellik.OzellikKimligi, 120),
-                    HizmetKimligi = TemizMetin(ozellik.HizmetKimligi, 160),
-                    HizmetSurumu = TemizMetin(ozellik.HizmetSurumu, 30),
-                    Aciklama = TemizMetin(ozellik.Aciklama, 400),
-                    Zorunlu = ozellik.Zorunlu
+                    SirketKimligi = TemizMetin(b.SirketKimligi, 100),
+                    UygulamaKimligi = TemizMetin(b.UygulamaKimligi, 120),
+                    AsgariSurum = TemizMetin(b.AsgariSurum, 30),
+                    ProtokolKimligi = TemizMetin(b.ProtokolKimligi, 120),
+                    BagimlilikTuru = Normal(b.BagimlilikTuru, "uygulama", 40),
+                    Zorunlu = b.Zorunlu
                 })
-                .Where(ozellik =>
-                    !string.IsNullOrWhiteSpace(ozellik.OzellikKimligi) &&
-                    !string.IsNullOrWhiteSpace(ozellik.HizmetKimligi) &&
-                    !string.IsNullOrWhiteSpace(ozellik.HizmetSurumu))
-                .GroupBy(ozellik => ozellik.OzellikKimligi, StringComparer.OrdinalIgnoreCase)
-                .Select(grup => grup.Last())
-                .ToList();
-
-            List<UygulamaBagimliligi> bagimliliklar = uygulama.Bagimliliklar
-                .Take(50)
-                .Select(bagimlilik => new UygulamaBagimliligi
-                {
-                    SirketKimligi = TemizMetin(bagimlilik.SirketKimligi, 100),
-                    UygulamaKimligi = TemizMetin(bagimlilik.UygulamaKimligi, 120),
-                    AsgariSurum = TemizMetin(bagimlilik.AsgariSurum, 30),
-                    ProtokolKimligi = TemizMetin(bagimlilik.ProtokolKimligi, 120),
-                    Zorunlu = bagimlilik.Zorunlu
-                })
-                .Where(bagimlilik =>
-                    !string.IsNullOrWhiteSpace(bagimlilik.SirketKimligi) &&
-                    !string.IsNullOrWhiteSpace(bagimlilik.UygulamaKimligi))
+                .Where(b => !string.IsNullOrWhiteSpace(b.SirketKimligi) && !string.IsNullOrWhiteSpace(b.UygulamaKimligi))
                 .ToList();
 
             sonuc[kimlik] = new SunulanUygulama
@@ -160,44 +136,31 @@ public static class SunucuYayinManifestDeposu
                 UygulamaKimligi = kimlik,
                 UygulamaAdi = ad,
                 Surum = surum,
-                Kategori = string.IsNullOrWhiteSpace(kategori) ? "diger" : kategori,
+                Kategori = Normal(uygulama.Kategori, "diger", 60),
+                UrunTuru = Normal(uygulama.UrunTuru, "uygulama", 60),
+                DagitimModeli = Normal(uygulama.DagitimModeli, "sunucu", 60),
                 Aciklama = TemizMetin(uygulama.Aciklama, 1_000),
                 Ozellikler = ozellikler,
                 Bagimliliklar = bagimliliklar,
-                DesteklenenProtokoller = uygulama.DesteklenenProtokoller
-                    .Take(50)
-                    .Select(protokol => TemizMetin(protokol, 120))
-                    .Where(protokol => !string.IsNullOrWhiteSpace(protokol))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList()
+                DesteklenenProtokoller = TemizListe(uygulama.DesteklenenProtokoller, 100, 120),
+                DesteklenenPlatformlar = TemizListe(uygulama.DesteklenenPlatformlar, 100, 120),
+                GerekliPlatformlar = TemizListe(uygulama.GerekliPlatformlar, 100, 120),
+                Mimariler = TemizListe(uygulama.Mimariler, 50, 80),
+                Etiketler = TemizListe(uygulama.Etiketler, 50, 80)
             };
         }
-
-        return sonuc.Values
-            .OrderBy(uygulama => uygulama.UygulamaKimligi, StringComparer.OrdinalIgnoreCase)
-            .ToList()
-            .AsReadOnly();
+        return sonuc.Values.OrderBy(u => u.UygulamaKimligi, StringComparer.OrdinalIgnoreCase).ToList().AsReadOnly();
     }
 
-    private static IReadOnlyList<SunulanOzelProtokol> TemizProtokoller(
-        IEnumerable<SunulanOzelProtokol>? protokoller)
+    private static IReadOnlyList<SunulanOzelProtokol> TemizProtokoller(IEnumerable<SunulanOzelProtokol>? protokoller)
     {
-        Dictionary<string, SunulanOzelProtokol> sonuc =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        foreach (SunulanOzelProtokol protokol in (protokoller ?? []).Take(50))
+        Dictionary<string, SunulanOzelProtokol> sonuc = new(StringComparer.OrdinalIgnoreCase);
+        foreach (SunulanOzelProtokol protokol in (protokoller ?? []).Take(100))
         {
             string kimlik = TemizMetin(protokol.ProtokolKimligi, 120);
             string ad = TemizMetin(protokol.ProtokolAdi, 100);
             string surum = TemizMetin(protokol.Surum, 30);
-
-            if (string.IsNullOrWhiteSpace(kimlik) ||
-                string.IsNullOrWhiteSpace(ad) ||
-                string.IsNullOrWhiteSpace(surum))
-            {
-                continue;
-            }
-
+            if (string.IsNullOrWhiteSpace(kimlik) || string.IsNullOrWhiteSpace(ad) || string.IsNullOrWhiteSpace(surum)) continue;
             sonuc[$"{kimlik}@{surum}"] = new SunulanOzelProtokol
             {
                 ProtokolKimligi = kimlik,
@@ -206,40 +169,31 @@ public static class SunucuYayinManifestDeposu
                 Aciklama = TemizMetin(protokol.Aciklama, 1_000),
                 SemaKimligi = TemizMetin(protokol.SemaKimligi, 120),
                 SemaOzeti = TemizMetin(protokol.SemaOzeti, 256),
-                Yetkinlikler = protokol.Yetkinlikler
-                    .Take(100)
-                    .Select(yetkinlik => new ProtokolYetkinligi
-                    {
-                        YetkinlikKimligi = TemizMetin(yetkinlik.YetkinlikKimligi, 120),
-                        HizmetKimligi = TemizMetin(yetkinlik.HizmetKimligi, 160),
-                        HizmetSurumu = TemizMetin(yetkinlik.HizmetSurumu, 30),
-                        Aciklama = TemizMetin(yetkinlik.Aciklama, 400)
-                    })
-                    .Where(yetkinlik =>
-                        !string.IsNullOrWhiteSpace(yetkinlik.YetkinlikKimligi) &&
-                        !string.IsNullOrWhiteSpace(yetkinlik.HizmetKimligi))
-                    .ToList(),
-                UyumluProtokoller = protokol.UyumluProtokoller
-                    .Take(50)
-                    .Select(uyumlu => TemizMetin(uyumlu, 120))
-                    .Where(uyumlu => !string.IsNullOrWhiteSpace(uyumlu))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList()
+                Yetkinlikler = (protokol.Yetkinlikler ?? []).Take(200).Select(y => new ProtokolYetkinligi
+                {
+                    YetkinlikKimligi = TemizMetin(y.YetkinlikKimligi, 120),
+                    HizmetKimligi = TemizMetin(y.HizmetKimligi, 160),
+                    HizmetSurumu = TemizMetin(y.HizmetSurumu, 30),
+                    Aciklama = TemizMetin(y.Aciklama, 400)
+                }).Where(y => !string.IsNullOrWhiteSpace(y.YetkinlikKimligi) && !string.IsNullOrWhiteSpace(y.HizmetKimligi)).ToList(),
+                UyumluProtokoller = TemizListe(protokol.UyumluProtokoller, 100, 120)
             };
         }
+        return sonuc.Values.OrderBy(p => p.ProtokolKimligi, StringComparer.OrdinalIgnoreCase).ThenBy(p => p.Surum, StringComparer.OrdinalIgnoreCase).ToList().AsReadOnly();
+    }
 
-        return sonuc.Values
-            .OrderBy(protokol => protokol.ProtokolKimligi, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(protokol => protokol.Surum, StringComparer.OrdinalIgnoreCase)
-            .ToList()
-            .AsReadOnly();
+    private static List<string> TemizListe(IEnumerable<string>? liste, int azamiAdet, int azamiUzunluk) =>
+        (liste ?? []).Take(azamiAdet).Select(x => TemizMetin(x, azamiUzunluk)).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    private static string Normal(string? metin, string varsayilan, int azamiUzunluk)
+    {
+        string sonuc = TemizMetin(metin, azamiUzunluk).ToLowerInvariant();
+        return string.IsNullOrWhiteSpace(sonuc) ? varsayilan : sonuc;
     }
 
     private static string TemizMetin(string? metin, int azamiUzunluk)
     {
         string sonuc = metin?.Trim() ?? string.Empty;
-        return sonuc.Length <= azamiUzunluk
-            ? sonuc
-            : sonuc[..azamiUzunluk];
+        return sonuc.Length <= azamiUzunluk ? sonuc : sonuc[..azamiUzunluk];
     }
 }
