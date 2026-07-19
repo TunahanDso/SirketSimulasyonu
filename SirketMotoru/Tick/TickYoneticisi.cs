@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using SirketMotoru.Ayarlar;
+using SirketMotoru.CanliPano;
 using SirketMotoru.Isler;
 using SirketMotoru.Kayit;
 using SirketMotoru.Musteriler;
@@ -198,6 +199,11 @@ public sealed class TickYoneticisi
                 .TickTalepleriniOlustur(
                     tickNumarasi);
 
+        CanliPanoDurumDeposu
+            .TalepleriGuncelle(
+                tickNumarasi,
+                talepler);
+
         TalepleriRaporla(
             tickNumarasi,
             talepler);
@@ -206,10 +212,15 @@ public sealed class TickYoneticisi
          * 4. Talepler uygun şirketlere atanır,
          *    şirket sonuçları doğrulanır ve ekonomi işlenir.
          */
-        await _isYoneticisi.TalepleriIsleAsync(
-            tickNumarasi,
-            talepler,
-            cancellationToken);
+        IsIslemeOzeti islemeOzeti =
+            await _isYoneticisi.TalepleriIsleAsync(
+                tickNumarasi,
+                talepler,
+                cancellationToken);
+
+        CanliPanoDurumDeposu
+            .IslemeOzetiniGuncelle(
+                islemeOzeti);
 
         /*
          * 5. İşlerin finansal etkileri şirket bilanço
