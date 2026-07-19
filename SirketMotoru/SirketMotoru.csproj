@@ -12,6 +12,10 @@
     <Compile Remove="CanliPano/YazilimBorsasiHtml.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV2.cs" />
     <Compile Remove="Isletim/SirketYonetimHtml.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV2.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusu.cs" />
+    <Compile Remove="Isletim/SirketIsletimYoneticisi.cs" />
+    <Compile Remove="Isletim/KodTabanliSirketIsletimYoneticisi.cs" />
     <Compile Remove="Musteriler/MusteriYoneticisi.cs" />
   </ItemGroup>
 
