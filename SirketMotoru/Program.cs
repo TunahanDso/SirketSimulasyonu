@@ -32,11 +32,10 @@ try
 
     string katalogDosyasiYolu = Path.Combine(motorVerileriKlasoru, "hizmet-katalogu.json");
     if (!File.Exists(katalogDosyasiYolu)) katalogDosyasiYolu = VeriDosyasiniBul("hizmet-katalogu.json");
-    HizmetKatalogAyarlari katalogAyarlari = await JsonDosyasiniOkuAsync<HizmetKatalogAyarlari>(katalogDosyasiYolu, jsonAyarlari, iptalKaynagi.Token);
+    HizmetKatalogAyarlari tohumKatalog = await JsonDosyasiniOkuAsync<HizmetKatalogAyarlari>(katalogDosyasiYolu, jsonAyarlari, iptalKaynagi.Token);
+    HizmetKatalogAyarlari katalogAyarlari = StandartKatalogV6.Genislet(tohumKatalog);
     HizmetKatalogu hizmetKatalogu = new(katalogAyarlari);
-    KonsolKayitcisi.Basari($"Hizmet kataloğu yüklendi | Sürüm: {hizmetKatalogu.KatalogSurumu} | Aktif: {hizmetKatalogu.Hizmetler.Count(h => h.Aktif)}");
-    foreach (HizmetTanimi hizmet in hizmetKatalogu.Hizmetler.Where(h => h.Aktif).OrderBy(h => h.HizmetKimligi, StringComparer.OrdinalIgnoreCase))
-        KonsolKayitcisi.Bilgi($"Hizmet: {hizmet.HizmetKimligi}@{hizmet.HizmetSurumu}");
+    KonsolKayitcisi.Basari($"V6 hizmet kataloğu yüklendi | Sürüm: {hizmetKatalogu.KatalogSurumu} | Aktif: {hizmetKatalogu.Hizmetler.Count(h => h.Aktif)} | Uygulama kategorisi: {StandartKatalogV6.UygulamaKategorileri.Count}");
 
     string musteriDosyasiYolu = Path.Combine(motorVerileriKlasoru, "musteriler.json");
     MusteriVeritabani musteriVeritabani = new(musteriDosyasiYolu);
