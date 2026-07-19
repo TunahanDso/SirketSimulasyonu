@@ -58,6 +58,13 @@ try
     await pazarFiyatYoneticisi.BaslatAsync(iptalKaynagi.Token);
     PazarGelirDuzeltmeYoneticisi pazarGelirDuzeltmeYoneticisi = new(isletimYoneticisi, sirketYoneticisi);
 
+    await using EkonomiV6Yoneticisi ekonomiV6Yoneticisi = new(
+        sirketYoneticisi,
+        musteriYoneticisi,
+        isletimYoneticisi,
+        motorVerileriKlasoru);
+    await ekonomiV6Yoneticisi.BaslatAsync(iptalKaynagi.Token);
+
     await BaslangicMigrasyonlari.TekSeferlikFinansmanDestekleriniUygulaAsync(sirketYoneticisi, motorVerileriKlasoru, iptalKaynagi.Token);
 
     TickYoneticisi tickYoneticisi = new(
@@ -68,7 +75,8 @@ try
         isletimYoneticisi,
         ekosistemYoneticisi,
         pazarFiyatYoneticisi,
-        pazarGelirDuzeltmeYoneticisi);
+        pazarGelirDuzeltmeYoneticisi,
+        ekonomiV6Yoneticisi);
 
     await using YazilimBorsasiSunucusu yazilimBorsasiSunucusu = new(
         motorAyarlari,
