@@ -9,36 +9,26 @@ public sealed class MusteriVeritabani
     private static readonly JsonSerializerOptions JsonAyarlari =
         new()
         {
-            PropertyNamingPolicy =
-                JsonNamingPolicy.CamelCase,
-
-            PropertyNameCaseInsensitive =
-                true,
-
-            WriteIndented =
-                true
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true,
+            WriteIndented = true
         };
 
     private readonly string _dosyaYolu;
-
     private readonly List<Musteri> _musteriler = [];
 
-    public IReadOnlyList<Musteri> Musteriler =>
-        _musteriler;
+    public IReadOnlyList<Musteri> Musteriler => _musteriler;
 
-    public MusteriVeritabani(
-        string dosyaYolu)
+    public MusteriVeritabani(string dosyaYolu)
     {
-        if (string.IsNullOrWhiteSpace(
-                dosyaYolu))
+        if (string.IsNullOrWhiteSpace(dosyaYolu))
         {
             throw new ArgumentException(
                 "Müşteri dosya yolu boş olamaz.",
                 nameof(dosyaYolu));
         }
 
-        _dosyaYolu =
-            Path.GetFullPath(dosyaYolu);
+        _dosyaYolu = Path.GetFullPath(dosyaYolu);
     }
 
     public async Task YukleVeyaOlusturAsync(
@@ -47,54 +37,68 @@ public sealed class MusteriVeritabani
     {
         if (musteriSayisi < 1)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(musteriSayisi));
+            throw new ArgumentOutOfRangeException(nameof(musteriSayisi));
         }
 
         if (File.Exists(_dosyaYolu))
         {
-            await YukleAsync(
-                cancellationToken);
+            await YukleAsync(cancellationToken);
 
-            KonsolKayitcisi.Basari(
-                $"{_musteriler.Count} statik müşteri yüklendi.");
+            if (_musteriler.Count < musteriSayisi)
+            {
+                int eskiMusteriSayisi = _musteriler.Count;
+                HashSet<string> mevcutKimlikler =
+                    _musteriler
+                        .Select(musteri => musteri.MusteriKimligi)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                foreach (Musteri yeniMusteri in
+                         MusterileriOlustur(musteriSayisi))
+                {
+                    if (mevcutKimlikler.Add(
+                            yeniMusteri.MusteriKimligi))
+                    {
+                        _musteriler.Add(yeniMusteri);
+                    }
+                }
+
+                await KaydetAsync(cancellationToken);
+
+                KonsolKayitcisi.Basari(
+                    $"Müşteri veritabanı genişletildi | " +
+                    $"Eski: {eskiMusteriSayisi} | " +
+                    $"Yeni: {_musteriler.Count}");
+            }
+            else
+            {
+                KonsolKayitcisi.Basari(
+                    $"{_musteriler.Count} statik müşteri yüklendi.");
+            }
 
             return;
         }
 
         _musteriler.AddRange(
-            MusterileriOlustur(
-                musteriSayisi));
-
-        await KaydetAsync(
-            cancellationToken);
+            MusterileriOlustur(musteriSayisi));
+        await KaydetAsync(cancellationToken);
 
         KonsolKayitcisi.Basari(
             $"{_musteriler.Count} statik müşteri " +
-            $"oluşturuldu ve kaydedildi.");
+            "oluşturuldu ve kaydedildi.");
     }
 
     public async Task KaydetAsync(
         CancellationToken cancellationToken)
     {
-        string? klasor =
-            Path.GetDirectoryName(
-                _dosyaYolu);
+        string? klasor = Path.GetDirectoryName(_dosyaYolu);
 
-        if (!string.IsNullOrWhiteSpace(
-                klasor))
+        if (!string.IsNullOrWhiteSpace(klasor))
         {
-            Directory.CreateDirectory(
-                klasor);
+            Directory.CreateDirectory(klasor);
         }
 
-        string geciciDosyaYolu =
-            $"{_dosyaYolu}.tmp";
-
-        string json =
-            JsonSerializer.Serialize(
-                _musteriler,
-                JsonAyarlari);
+        string geciciDosyaYolu = $"{_dosyaYolu}.tmp";
+        string json = JsonSerializer.Serialize(_musteriler, JsonAyarlari);
 
         await File.WriteAllTextAsync(
             geciciDosyaYolu,
@@ -108,11 +112,9 @@ public sealed class MusteriVeritabani
             overwrite: true);
     }
 
-    public Musteri? MusteriyiBul(
-        string musteriKimligi)
+    public Musteri? MusteriyiBul(string musteriKimligi)
     {
-        if (string.IsNullOrWhiteSpace(
-                musteriKimligi))
+        if (string.IsNullOrWhiteSpace(musteriKimligi))
         {
             return null;
         }
@@ -148,79 +150,51 @@ public sealed class MusteriVeritabani
 
         foreach (Musteri musteri in musteriler)
         {
-            MusteriyiDogrula(
-                musteri);
-
-            _musteriler.Add(
-                musteri);
+            MusteriyiDogrula(musteri);
+            _musteriler.Add(musteri);
         }
     }
 
     private static List<Musteri> MusterileriOlustur(
         int musteriSayisi)
     {
-        Random rastgele =
-            new(1881);
+        Random rastgele = new(1881);
+        List<Musteri> musteriler = new(musteriSayisi);
 
-        List<Musteri> musteriler =
-            new(musteriSayisi);
-
-        for (int sira = 1;
-             sira <= musteriSayisi;
-             sira++)
+        for (int sira = 1; sira <= musteriSayisi; sira++)
         {
-            MusteriTuru musteriTuru =
-                MusteriTuruSec(
-                    rastgele);
+            MusteriTuru musteriTuru = MusteriTuruSec(rastgele);
 
             Musteri musteri =
                 new()
                 {
-                    MusteriKimligi =
-                        $"musteri-{sira:D5}",
-
-                    MusteriAdi =
-                        $"Müşteri {sira:D5}",
-
-                    MusteriTuru =
+                    MusteriKimligi = $"musteri-{sira:D5}",
+                    MusteriAdi = $"Müşteri {sira:D5}",
+                    MusteriTuru = musteriTuru,
+                    Bakiye = BaslangicBakiyesiOlustur(
                         musteriTuru,
-
-                    Bakiye =
-                        BaslangicBakiyesiOlustur(
-                            musteriTuru,
-                            rastgele),
-
-                    TickBasinaHarcamaButcesi =
-                        TickButcesiOlustur(
-                            musteriTuru,
-                            rastgele),
-
-                    TalepOlusturmaOlasiligi =
-                        TalepOlasiligiOlustur(
-                            musteriTuru,
-                            rastgele),
-
-                    Tercihler =
-                        TercihOlustur(
-                            musteriTuru,
-                            rastgele),
-
-                    OlusturulmaZamani =
-                        DateTimeOffset.UtcNow
+                        rastgele),
+                    TickBasinaHarcamaButcesi = TickButcesiOlustur(
+                        musteriTuru,
+                        rastgele),
+                    TalepOlusturmaOlasiligi = TalepOlasiligiOlustur(
+                        musteriTuru,
+                        rastgele),
+                    Tercihler = TercihOlustur(
+                        musteriTuru,
+                        rastgele),
+                    OlusturulmaZamani = DateTimeOffset.UtcNow
                 };
 
-            musteriler.Add(
-                musteri);
+            musteriler.Add(musteri);
         }
 
         return musteriler;
     }
 
-    private static MusteriTuru MusteriTuruSec(
-        Random rastgele)
+    private static MusteriTuru MusteriTuruSec(Random rastgele)
     {
-        int deger =
-            rastgele.Next(100);
+        int deger = rastgele.Next(100);
 
         return deger switch
         {
@@ -238,21 +212,11 @@ public sealed class MusteriVeritabani
     {
         return musteriTuru switch
         {
-            MusteriTuru.Bireysel =>
-                rastgele.Next(500, 5_001),
-
-            MusteriTuru.KucukIsletme =>
-                rastgele.Next(5_000, 30_001),
-
-            MusteriTuru.OrtaOlcekliIsletme =>
-                rastgele.Next(25_000, 150_001),
-
-            MusteriTuru.Kurumsal =>
-                rastgele.Next(150_000, 1_000_001),
-
-            MusteriTuru.KamuKurumu =>
-                rastgele.Next(500_000, 2_000_001),
-
+            MusteriTuru.Bireysel => rastgele.Next(500, 5_001),
+            MusteriTuru.KucukIsletme => rastgele.Next(5_000, 30_001),
+            MusteriTuru.OrtaOlcekliIsletme => rastgele.Next(25_000, 150_001),
+            MusteriTuru.Kurumsal => rastgele.Next(150_000, 1_000_001),
+            MusteriTuru.KamuKurumu => rastgele.Next(500_000, 2_000_001),
             _ => 1_000
         };
     }
@@ -263,22 +227,12 @@ public sealed class MusteriVeritabani
     {
         return musteriTuru switch
         {
-            MusteriTuru.Bireysel =>
-                rastgele.Next(10, 101),
-
-            MusteriTuru.KucukIsletme =>
-                rastgele.Next(50, 501),
-
-            MusteriTuru.OrtaOlcekliIsletme =>
-                rastgele.Next(250, 2_001),
-
-            MusteriTuru.Kurumsal =>
-                rastgele.Next(1_000, 10_001),
-
-            MusteriTuru.KamuKurumu =>
-                rastgele.Next(2_500, 25_001),
-
-            _ => 50
+            MusteriTuru.Bireysel => rastgele.Next(15, 151),
+            MusteriTuru.KucukIsletme => rastgele.Next(75, 751),
+            MusteriTuru.OrtaOlcekliIsletme => rastgele.Next(400, 3_001),
+            MusteriTuru.Kurumsal => rastgele.Next(1_500, 15_001),
+            MusteriTuru.KamuKurumu => rastgele.Next(4_000, 35_001),
+            _ => 75
         };
     }
 
@@ -289,17 +243,19 @@ public sealed class MusteriVeritabani
         double temelOlasilik =
             musteriTuru switch
             {
-                MusteriTuru.Bireysel => 0.006,
-                MusteriTuru.KucukIsletme => 0.015,
-                MusteriTuru.OrtaOlcekliIsletme => 0.030,
-                MusteriTuru.Kurumsal => 0.060,
-                MusteriTuru.KamuKurumu => 0.040,
-                _ => 0.010
+                MusteriTuru.Bireysel => 0.012,
+                MusteriTuru.KucukIsletme => 0.030,
+                MusteriTuru.OrtaOlcekliIsletme => 0.060,
+                MusteriTuru.Kurumsal => 0.120,
+                MusteriTuru.KamuKurumu => 0.080,
+                _ => 0.020
             };
 
-        return temelOlasilik *
-               (0.75 +
-                rastgele.NextDouble() * 0.50);
+        return Math.Clamp(
+            temelOlasilik *
+            (0.80 + rastgele.NextDouble() * 0.40),
+            0,
+            1);
     }
 
     private static MusteriTercihleri TercihOlustur(
@@ -312,48 +268,43 @@ public sealed class MusteriVeritabani
                 MusteriTuru.Bireysel =>
                     new MusteriTercihleri
                     {
-                        FiyatAgirligi = 0.55,
+                        FiyatAgirligi = 0.45,
                         ItibarAgirligi = 0.15,
-                        HizAgirligi = 0.15,
-                        GuvenilirlikAgirligi = 0.15
+                        HizAgirligi = 0.20,
+                        GuvenilirlikAgirligi = 0.20
                     },
-
                 MusteriTuru.KucukIsletme =>
                     new MusteriTercihleri
                     {
-                        FiyatAgirligi = 0.40,
+                        FiyatAgirligi = 0.30,
                         ItibarAgirligi = 0.20,
-                        HizAgirligi = 0.15,
-                        GuvenilirlikAgirligi = 0.25
-                    },
-
-                MusteriTuru.OrtaOlcekliIsletme =>
-                    new MusteriTercihleri
-                    {
-                        FiyatAgirligi = 0.25,
-                        ItibarAgirligi = 0.25,
                         HizAgirligi = 0.20,
                         GuvenilirlikAgirligi = 0.30
                     },
-
-                MusteriTuru.Kurumsal =>
-                    new MusteriTercihleri
-                    {
-                        FiyatAgirligi = 0.10,
-                        ItibarAgirligi = 0.30,
-                        HizAgirligi = 0.20,
-                        GuvenilirlikAgirligi = 0.40
-                    },
-
-                MusteriTuru.KamuKurumu =>
+                MusteriTuru.OrtaOlcekliIsletme =>
                     new MusteriTercihleri
                     {
                         FiyatAgirligi = 0.20,
                         ItibarAgirligi = 0.25,
-                        HizAgirligi = 0.15,
+                        HizAgirligi = 0.25,
+                        GuvenilirlikAgirligi = 0.30
+                    },
+                MusteriTuru.Kurumsal =>
+                    new MusteriTercihleri
+                    {
+                        FiyatAgirligi = 0.08,
+                        ItibarAgirligi = 0.27,
+                        HizAgirligi = 0.25,
                         GuvenilirlikAgirligi = 0.40
                     },
-
+                MusteriTuru.KamuKurumu =>
+                    new MusteriTercihleri
+                    {
+                        FiyatAgirligi = 0.15,
+                        ItibarAgirligi = 0.25,
+                        HizAgirligi = 0.20,
+                        GuvenilirlikAgirligi = 0.40
+                    },
                 _ =>
                     new MusteriTercihleri
                     {
@@ -366,57 +317,36 @@ public sealed class MusteriVeritabani
 
         tercihler.FiyatAgirligi *=
             0.90 + rastgele.NextDouble() * 0.20;
-
         tercihler.ItibarAgirligi *=
             0.90 + rastgele.NextDouble() * 0.20;
-
         tercihler.HizAgirligi *=
             0.90 + rastgele.NextDouble() * 0.20;
-
         tercihler.GuvenilirlikAgirligi *=
             0.90 + rastgele.NextDouble() * 0.20;
-
         tercihler.NormalizeEt();
-
         return tercihler;
     }
 
-    private static void MusteriyiDogrula(
-        Musteri musteri)
+    private static void MusteriyiDogrula(Musteri musteri)
     {
-        if (string.IsNullOrWhiteSpace(
-                musteri.MusteriKimligi))
+        if (string.IsNullOrWhiteSpace(musteri.MusteriKimligi))
         {
             throw new InvalidOperationException(
                 "Müşteri kimliği boş olamaz.");
         }
 
         musteri.MusteriAdi =
-            string.IsNullOrWhiteSpace(
-                musteri.MusteriAdi)
+            string.IsNullOrWhiteSpace(musteri.MusteriAdi)
                 ? musteri.MusteriKimligi
                 : musteri.MusteriAdi.Trim();
-
-        musteri.Tercihler ??=
-            new MusteriTercihleri();
-
+        musteri.Tercihler ??= new MusteriTercihleri();
         musteri.Tercihler.NormalizeEt();
-
         musteri.HizmetKullanimSayilari ??=
             new Dictionary<string, int>(
                 StringComparer.OrdinalIgnoreCase);
-
         musteri.IslemGecmisi ??= [];
-
-        if (musteri.Bakiye < 0)
-        {
-            musteri.Bakiye = 0;
-        }
-
+        musteri.Bakiye = Math.Max(0, musteri.Bakiye);
         musteri.TalepOlusturmaOlasiligi =
-            Math.Clamp(
-                musteri.TalepOlusturmaOlasiligi,
-                0,
-                1);
+            Math.Clamp(musteri.TalepOlusturmaOlasiligi, 0, 1);
     }
 }
