@@ -5,7 +5,7 @@ mod matematik_topla;
 mod metin_frekans_analizi;
 mod metin_karakter_say;
 mod metin_kelime_say;
-mod platform;
+mod platform_v2;
 mod veri_medyan_hesapla;
 mod veri_ortalama_hesapla;
 mod veri_standart_sapma;
@@ -94,7 +94,7 @@ pub fn hizmeti_calistir(
             metin_frekans_analizi::calistir(istek_verisi_json)
         }
         (kimlik, "1.0") if kimlik.starts_with("tunix.") => {
-            platform::calistir(kimlik, istek_verisi_json)
+            platform_v2::calistir(kimlik, istek_verisi_json)
         }
         _ => Err(HizmetHatasi::DesteklenmeyenHizmet),
     }
