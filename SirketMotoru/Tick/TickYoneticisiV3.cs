@@ -20,6 +20,7 @@ public sealed class TickYoneticisi
     private readonly PazarFiyatYoneticisi _pazarFiyatYoneticisi;
     private readonly PazarGelirDuzeltmeYoneticisi _pazarGelirDuzeltmeYoneticisi;
     private readonly EkonomiV6Yoneticisi _ekonomiV6Yoneticisi;
+    private readonly FinansV7Yoneticisi _finansV7Yoneticisi;
     private readonly IsYoneticisi _isYoneticisi;
     private long _tickNumarasi;
     private bool _calisiyor;
@@ -36,28 +37,20 @@ public sealed class TickYoneticisi
         EkosistemYoneticisi ekosistemYoneticisi,
         PazarFiyatYoneticisi pazarFiyatYoneticisi,
         PazarGelirDuzeltmeYoneticisi pazarGelirDuzeltmeYoneticisi,
-        EkonomiV6Yoneticisi ekonomiV6Yoneticisi)
+        EkonomiV6Yoneticisi ekonomiV6Yoneticisi,
+        FinansV7Yoneticisi finansV7Yoneticisi)
     {
-        ArgumentNullException.ThrowIfNull(ayarlar);
-        ArgumentNullException.ThrowIfNull(sirketYoneticisi);
-        ArgumentNullException.ThrowIfNull(musteriYoneticisi);
-        ArgumentNullException.ThrowIfNull(musteriIsletimSistemiYoneticisi);
-        ArgumentNullException.ThrowIfNull(isletimYoneticisi);
-        ArgumentNullException.ThrowIfNull(ekosistemYoneticisi);
-        ArgumentNullException.ThrowIfNull(pazarFiyatYoneticisi);
-        ArgumentNullException.ThrowIfNull(pazarGelirDuzeltmeYoneticisi);
-        ArgumentNullException.ThrowIfNull(ekonomiV6Yoneticisi);
+        _ayarlar = ayarlar ?? throw new ArgumentNullException(nameof(ayarlar));
+        _sirketYoneticisi = sirketYoneticisi ?? throw new ArgumentNullException(nameof(sirketYoneticisi));
+        _musteriYoneticisi = musteriYoneticisi ?? throw new ArgumentNullException(nameof(musteriYoneticisi));
+        _musteriIsletimSistemiYoneticisi = musteriIsletimSistemiYoneticisi ?? throw new ArgumentNullException(nameof(musteriIsletimSistemiYoneticisi));
+        _isletimYoneticisi = isletimYoneticisi ?? throw new ArgumentNullException(nameof(isletimYoneticisi));
+        _ekosistemYoneticisi = ekosistemYoneticisi ?? throw new ArgumentNullException(nameof(ekosistemYoneticisi));
+        _pazarFiyatYoneticisi = pazarFiyatYoneticisi ?? throw new ArgumentNullException(nameof(pazarFiyatYoneticisi));
+        _pazarGelirDuzeltmeYoneticisi = pazarGelirDuzeltmeYoneticisi ?? throw new ArgumentNullException(nameof(pazarGelirDuzeltmeYoneticisi));
+        _ekonomiV6Yoneticisi = ekonomiV6Yoneticisi ?? throw new ArgumentNullException(nameof(ekonomiV6Yoneticisi));
+        _finansV7Yoneticisi = finansV7Yoneticisi ?? throw new ArgumentNullException(nameof(finansV7Yoneticisi));
         if (ayarlar.TickSuresiSaniye <= 0) throw new ArgumentOutOfRangeException(nameof(ayarlar));
-
-        _ayarlar = ayarlar;
-        _sirketYoneticisi = sirketYoneticisi;
-        _musteriYoneticisi = musteriYoneticisi;
-        _musteriIsletimSistemiYoneticisi = musteriIsletimSistemiYoneticisi;
-        _isletimYoneticisi = isletimYoneticisi;
-        _ekosistemYoneticisi = ekosistemYoneticisi;
-        _pazarFiyatYoneticisi = pazarFiyatYoneticisi;
-        _pazarGelirDuzeltmeYoneticisi = pazarGelirDuzeltmeYoneticisi;
-        _ekonomiV6Yoneticisi = ekonomiV6Yoneticisi;
         _isYoneticisi = new IsYoneticisi(sirketYoneticisi, musteriYoneticisi, new SonucDogrulayicisi());
     }
 
@@ -65,7 +58,7 @@ public sealed class TickYoneticisi
     {
         if (_calisiyor) throw new InvalidOperationException("Tick sistemi zaten çalışıyor.");
         _calisiyor = true;
-        KonsolKayitcisi.Bilgi($"Tick sistemi başlatıldı. Tick süresi: {_ayarlar.TickSuresiSaniye} saniye.");
+        KonsolKayitcisi.Bilgi($"Tick sistemi V7 başlatıldı. Tick süresi: {_ayarlar.TickSuresiSaniye} saniye.");
         try
         {
             while (!cancellationToken.IsCancellationRequested)
@@ -106,13 +99,11 @@ public sealed class TickYoneticisi
         cancellationToken.ThrowIfCancellationRequested();
         _musteriYoneticisi.TickBasindaMusterileriGuncelle(tickNumarasi);
         await _sirketYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
-
         await _ekosistemYoneticisi.PazariHazirlaAsync(tickNumarasi, cancellationToken);
         _musteriIsletimSistemiYoneticisi.TickCalistir(tickNumarasi);
 
-        // V6 önce teknik kategori ve tek fiziksel kapasite havuzunu uygular.
+        await _finansV7Yoneticisi.TickOncesiAsync(tickNumarasi, cancellationToken);
         await _ekonomiV6Yoneticisi.TickOncesiAsync(tickNumarasi, cancellationToken);
-
         await _pazarGelirDuzeltmeYoneticisi.TickOncesiHazirlaAsync(tickNumarasi, cancellationToken);
         await _isletimYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
         await _pazarFiyatYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
@@ -121,17 +112,17 @@ public sealed class TickYoneticisi
         IReadOnlyList<HizmetTalebi> talepler = _musteriYoneticisi.TickTalepleriniOlustur(tickNumarasi);
         CanliPanoDurumDeposu.TalepleriGuncelle(tickNumarasi, talepler);
         TalepleriRaporla(tickNumarasi, talepler);
-
         IsIslemeOzeti islemeOzeti = await _isYoneticisi.TalepleriIsleAsync(tickNumarasi, talepler, cancellationToken);
         CanliPanoDurumDeposu.IslemeOzetiniGuncelle(islemeOzeti);
 
-        await _sirketYoneticisi.BilancolariKaydetVeYayinlaAsync(tickNumarasi, cancellationToken);
         await _ekonomiV6Yoneticisi.TickSonuAsync(tickNumarasi, cancellationToken);
+        await _finansV7Yoneticisi.TickSonuAsync(tickNumarasi, cancellationToken);
+        await _sirketYoneticisi.BilancolariKaydetVeYayinlaAsync(tickNumarasi, cancellationToken);
         await _musteriYoneticisi.GerekirseKaydetAsync(tickNumarasi, cancellationToken);
         TickOzetiniYaz(tickNumarasi, talepler);
     }
 
-    private void TalepleriRaporla(long tickNumarasi, IReadOnlyList<HizmetTalebi> talepler)
+    private static void TalepleriRaporla(long tickNumarasi, IReadOnlyList<HizmetTalebi> talepler)
     {
         if (talepler.Count == 0)
         {
@@ -149,19 +140,19 @@ public sealed class TickYoneticisi
     {
         IReadOnlyList<IsletimSistemiPazarKaydi> sistemler = IsletimSistemiPazarDeposu.Getir();
         PazarFiyatDosyasi fiyatPazari = PazarFiyatDeposu.Getir();
+        FinansV7Dosyasi finans = FinansV7Deposu.Getir();
         V6PanoDurumu v6 = V6PanoDeposu.Getir();
         int osKullanan = sistemler.Sum(x => x.AktifMusteriSayisi);
-        int osBekleyen = Math.Max(0, _musteriYoneticisi.AktifMusteriSayisi - osKullanan);
         int fiyatKaybi = fiyatPazari.Urunler.Sum(x => x.BuTickFiyatKaybi + x.BuTickEngellenenYeniKullanici);
-        int rakibeGoc = fiyatPazari.Urunler.Sum(x => x.BuTickRakiptenGelenKullanici);
+        decimal tickGelir = finans.Sirketler.Sum(x => x.Tickler.LastOrDefault()?.ToplamGelir ?? 0);
+        decimal tickGider = finans.Sirketler.Sum(x => x.Tickler.LastOrDefault()?.ToplamGider ?? 0);
         KonsolKayitcisi.Bilgi(
             $"Tick {tickNumarasi} özeti | Aktif müşteri: {_musteriYoneticisi.AktifMusteriSayisi} | " +
-            $"OS kullanan: {osKullanan} | OS bekleyen: {osBekleyen} | Aktif OS: {sistemler.Count} | " +
-            $"Fiyat nedeniyle reddedilen/kaçan: {fiyatKaybi} | Rakibe göç: {rakibeGoc} | " +
-            $"V6 gerçek kapasite: {v6.Sirketler.Sum(x => x.GercekKapasiteBirimi)} | " +
-            $"V6 kullanılan kapasite: {v6.Sirketler.Sum(x => x.KullanilanKapasiteBirimi)} | " +
+            $"OS kullanan: {osKullanan} | OS bekleyen: {Math.Max(0, _musteriYoneticisi.AktifMusteriSayisi - osKullanan)} | " +
+            $"Fiyat nedeniyle reddedilen/kaçan: {fiyatKaybi} | " +
+            $"V6 gerçek kapasite: {v6.Sirketler.Sum(x => x.GercekKapasiteBirimi)} | V6 kullanılan kapasite: {v6.Sirketler.Sum(x => x.KullanilanKapasiteBirimi)} | " +
+            $"Tick gelir: {tickGelir:N2} | Tick gider: {tickGider:N2} | Tick net: {tickGelir - tickGider:N2} | " +
             $"Yeni talep: {talepler.Count} | Talep bütçesi: {talepler.Sum(t => t.AzamiButce):N2} | " +
-            $"Müşteri bakiyesi: {_musteriYoneticisi.ToplamMusteriBakiyesi:N2} | " +
             $"Şirket kasaları: {_sirketYoneticisi.SirketKayitlari.Sum(s => s.Kasa):N2}");
     }
 
