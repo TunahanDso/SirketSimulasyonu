@@ -7,9 +7,8 @@ namespace SirketMotoru.Tick;
 
 /// <summary>
 /// Sunucusu kapalı olan şirketin hizmet ve uygulama tanımlarına dokunmadan
-/// bilanço, puan, kredi, yatırım, ürün ve finans defterini tick boyunca dondurur.
-/// Kapalı şirketin uygulamaları o tickte piyasaya katılmaz; global tick ve bağlı
-/// şirketler normal biçimde çalışmaya devam eder.
+/// bilanço, puan, kredi, yatırım, ürün, finans ve grafik geçmişini tick boyunca
+/// dondurur. Kapalı şirketin uygulamaları o tickte piyasaya katılmaz.
 /// </summary>
 public sealed class BaglantiBazliSirketDonmaYoneticisi
 {
@@ -55,18 +54,26 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
     private readonly FieldInfo _finansKilitAlani;
     private readonly MethodInfo _finansKaydetMetodu;
 
+    private readonly EkonomiV6Yoneticisi _ekonomi;
+    private readonly FieldInfo _ekonomiDurumAlani;
+    private readonly FieldInfo _ekonomiKilitAlani;
+    private readonly MethodInfo _ekonomiKaydetMetodu;
+
     private readonly Dictionary<string, SirketAnlik> _sirketAnliklari = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SirketIsletimDurumu> _isletimAnliklari = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, FinansV7SirketKaydi?> _finansAnliklari = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, V6SirketDurumu?> _v6Anliklari = new(StringComparer.OrdinalIgnoreCase);
 
     public BaglantiBazliSirketDonmaYoneticisi(
         SirketYoneticisi sirketler,
         KodTabanliSirketIsletimYoneticisi isletim,
-        FinansV7Yoneticisi finans)
+        FinansV7Yoneticisi finans,
+        EkonomiV6Yoneticisi ekonomi)
     {
         _sirketler = sirketler ?? throw new ArgumentNullException(nameof(sirketler));
         ArgumentNullException.ThrowIfNull(isletim);
         _finans = finans ?? throw new ArgumentNullException(nameof(finans));
+        _ekonomi = ekonomi ?? throw new ArgumentNullException(nameof(ekonomi));
 
         FieldInfo temelAlani = typeof(KodTabanliSirketIsletimYoneticisi)
             .GetField("_temel", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -88,6 +95,14 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
             ?? throw new InvalidOperationException("Finans kilidi bulunamadı.");
         _finansKaydetMetodu = finansTur.GetMethod("KaydetAsync", BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("Finans kayıt metodu bulunamadı.");
+
+        Type ekonomiTur = typeof(EkonomiV6Yoneticisi);
+        _ekonomiDurumAlani = ekonomiTur.GetField("_durum", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("V6 grafik durum alanı bulunamadı.");
+        _ekonomiKilitAlani = ekonomiTur.GetField("_kilit", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("V6 grafik kilidi bulunamadı.");
+        _ekonomiKaydetMetodu = ekonomiTur.GetMethod("KaydetAsync", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("V6 grafik kayıt metodu bulunamadı.");
     }
 
     public async Task TickOncesiAsync(CancellationToken cancellationToken)
@@ -95,6 +110,7 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
         _sirketAnliklari.Clear();
         _isletimAnliklari.Clear();
         _finansAnliklari.Clear();
+        _v6Anliklari.Clear();
 
         foreach (SirketKaydi sirket in _sirketler.SirketKayitlari.Where(x => !x.BagliMi))
             _sirketAnliklari[sirket.SirketKimligi] = Al(sirket);
@@ -102,13 +118,13 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
         if (_sirketAnliklari.Count == 0) return;
         await IsletimAnliklariniAlVePazardanCikarAsync(cancellationToken);
         await FinansAnliklariniAlAsync(cancellationToken);
+        await V6AnliklariniAlAsync(cancellationToken);
     }
 
     public async Task GeriYukleAsync(long tickNumarasi, CancellationToken cancellationToken)
     {
         if (_sirketAnliklari.Count == 0) return;
 
-        // Bilanço kaydı yazılmadan önce şirketin kamuya açık finans alanları geri konur.
         foreach ((string kimlik, SirketAnlik anlik) in _sirketAnliklari)
         {
             SirketKaydi? sirket = _sirketler.SirketKayitlari.FirstOrDefault(x =>
@@ -118,6 +134,7 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
 
         await IsletimiGeriYukleAsync(cancellationToken);
         await FinansiGeriYukleAsync(tickNumarasi, cancellationToken);
+        await V6GecmisiniGeriYukleAsync(tickNumarasi, cancellationToken);
     }
 
     private async Task IsletimAnliklariniAlVePazardanCikarAsync(CancellationToken cancellationToken)
@@ -133,8 +150,7 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
                          .Where(x => _sirketAnliklari.ContainsKey(x.SirketKimligi)))
             {
                 _isletimAnliklari[durum.SirketKimligi] = Kopyala(durum);
-                foreach (UrunKaydi urun in durum.Urunler)
-                    urun.Aktif = false;
+                foreach (UrunKaydi urun in durum.Urunler) urun.Aktif = false;
                 durum.ToplamAboneSayisi = 0;
             }
         }
@@ -155,6 +171,25 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
                 FinansV7SirketKaydi? kayit = dosya.Sirketler.FirstOrDefault(x =>
                     x.SirketKimligi.Equals(kimlik, StringComparison.OrdinalIgnoreCase));
                 _finansAnliklari[kimlik] = kayit is null ? null : Kopyala(kayit);
+            }
+        }
+        finally { kilit.Release(); }
+    }
+
+    private async Task V6AnliklariniAlAsync(CancellationToken cancellationToken)
+    {
+        SemaphoreSlim kilit = (SemaphoreSlim)(_ekonomiKilitAlani.GetValue(_ekonomi)
+            ?? throw new InvalidOperationException("V6 grafik kilidi boş."));
+        await kilit.WaitAsync(cancellationToken);
+        try
+        {
+            V6PanoDurumu durum = (V6PanoDurumu)(_ekonomiDurumAlani.GetValue(_ekonomi)
+                ?? throw new InvalidOperationException("V6 grafik durumu boş."));
+            foreach (string kimlik in _sirketAnliklari.Keys)
+            {
+                V6SirketDurumu? kayit = durum.Sirketler.FirstOrDefault(x =>
+                    x.SirketKimligi.Equals(kimlik, StringComparison.OrdinalIgnoreCase));
+                _v6Anliklari[kimlik] = kayit is null ? null : Kopyala(kayit);
             }
         }
         finally { kilit.Release(); }
@@ -193,7 +228,6 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
         {
             FinansV7Dosyasi dosya = (FinansV7Dosyasi)(_finansDosyaAlani.GetValue(_finans)
                 ?? throw new InvalidOperationException("Finans dosyası boş."));
-
             foreach ((string kimlik, FinansV7SirketKaydi? anlik) in _finansAnliklari)
             {
                 dosya.Sirketler.RemoveAll(x =>
@@ -206,6 +240,32 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
 
             Task kayit = (Task)(_finansKaydetMetodu.Invoke(_finans, [cancellationToken])
                 ?? throw new InvalidOperationException("Finans kayıt görevi oluşturulamadı."));
+            await kayit;
+        }
+        finally { kilit.Release(); }
+    }
+
+    private async Task V6GecmisiniGeriYukleAsync(long tickNumarasi, CancellationToken cancellationToken)
+    {
+        SemaphoreSlim kilit = (SemaphoreSlim)(_ekonomiKilitAlani.GetValue(_ekonomi)
+            ?? throw new InvalidOperationException("V6 grafik kilidi boş."));
+        await kilit.WaitAsync(cancellationToken);
+        try
+        {
+            V6PanoDurumu durum = (V6PanoDurumu)(_ekonomiDurumAlani.GetValue(_ekonomi)
+                ?? throw new InvalidOperationException("V6 grafik durumu boş."));
+            foreach ((string kimlik, V6SirketDurumu? anlik) in _v6Anliklari)
+            {
+                durum.Sirketler.RemoveAll(x =>
+                    x.SirketKimligi.Equals(kimlik, StringComparison.OrdinalIgnoreCase));
+                if (anlik is not null) durum.Sirketler.Add(Kopyala(anlik));
+            }
+            durum.Haberler.RemoveAll(x =>
+                x.TickNumarasi == tickNumarasi && _sirketAnliklari.ContainsKey(x.SirketKimligi));
+            V6PanoDeposu.Guncelle(durum);
+
+            Task kayit = (Task)(_ekonomiKaydetMetodu.Invoke(_ekonomi, [cancellationToken])
+                ?? throw new InvalidOperationException("V6 grafik kayıt görevi oluşturulamadı."));
             await kayit;
         }
         finally { kilit.Release(); }
