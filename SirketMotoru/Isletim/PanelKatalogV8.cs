@@ -12,7 +12,7 @@ public static class PanelKatalogV8
         ArgumentNullException.ThrowIfNull(sirket);
         SunucuYayinManifesti manifest = SunucuYayinManifestDeposu.Getir(sirket.SirketKimligi);
 
-        var hizmetler = katalog.Hizmetler
+        return katalog.Hizmetler
             .OrderBy(x => x.HizmetKimligi, StringComparer.OrdinalIgnoreCase)
             .Select(tanim =>
             {
@@ -30,33 +30,20 @@ public static class PanelKatalogV8
                     tanim.Aktif,
                     tanim.ZamanAsimiMs,
                     hizmetAilesi = Aile(tanim.HizmetKimligi),
+                    sahipMi = sahip is not null,
                     sirketSahip = sahip is not null,
                     sirketAktif = sahip?.Aktif ?? false,
-                    sirketFiyati = sahip?.BirimFiyat ?? 0,
+                    birimFiyat = sahip is null
+                        ? MotorHizmetFiyatlari.Fiyat(tanim.HizmetKimligi, tanim.HizmetSurumu)
+                        : MotorHizmetFiyatlari.Fiyat(sahip.HizmetKimligi, sahip.HizmetSurumu),
+                    sirketFiyati = sahip is null
+                        ? 0
+                        : MotorHizmetFiyatlari.Fiyat(sahip.HizmetKimligi, sahip.HizmetSurumu),
                     sirketKapasitesi = sahip?.AzamiEszamanliIs ?? 0,
                     uygulamaKullanimi
                 };
             })
             .ToList();
-
-        return new
-        {
-            toplam = hizmetler.Count,
-            sirketinSahipOldugu = hizmetler.Count(x => x.sirketSahip),
-            sirketinAktifSundugu = hizmetler.Count(x => x.sirketAktif),
-            uygulamalardaKullanilan = hizmetler.Count(x => x.uygulamaKullanimi > 0),
-            aileler = hizmetler.GroupBy(x => x.hizmetAilesi, StringComparer.OrdinalIgnoreCase)
-                .Select(g => new
-                {
-                    aile = g.Key,
-                    toplam = g.Count(),
-                    sahip = g.Count(x => x.sirketSahip),
-                    aktif = g.Count(x => x.sirketAktif)
-                })
-                .OrderBy(x => x.aile)
-                .ToList(),
-            hizmetler
-        };
     }
 
     public static object UygulamaKategorileriOlustur(SirketKaydi sirket)
@@ -68,7 +55,7 @@ public static class PanelKatalogV8
             .Select(x => x.HizmetKimligi)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var kategoriler = StandartKatalogV6.UygulamaKategorileri
+        return StandartKatalogV6.UygulamaKategorileri
             .OrderBy(x => x.KategoriKimligi, StringComparer.OrdinalIgnoreCase)
             .Select(kategori =>
             {
@@ -104,29 +91,12 @@ public static class PanelKatalogV8
                     kategori.TabanKapasiteTuketimi,
                     kategori.KullaniciBasinaKapasiteTuketimi,
                     eksikZorunluHizmetler = eksik,
+                    teknikOlarakHazirMi = eksik.Count == 0,
                     sirketTeknikOlarakHazir = eksik.Count == 0,
                     sirketUygulamalari
                 };
             })
             .ToList();
-
-        return new
-        {
-            toplam = kategoriler.Count,
-            sirketinUygulamaYayinladigi = kategoriler.Count(x => x.sirketUygulamalari.Count > 0),
-            sirketinTeknikOlarakHazirOldugu = kategoriler.Count(x => x.sirketTeknikOlarakHazir),
-            sektorler = kategoriler.GroupBy(x => x.Sektor, StringComparer.OrdinalIgnoreCase)
-                .Select(g => new
-                {
-                    sektor = g.Key,
-                    kategoriSayisi = g.Count(),
-                    hazir = g.Count(x => x.sirketTeknikOlarakHazir),
-                    uygulamali = g.Count(x => x.sirketUygulamalari.Count > 0)
-                })
-                .OrderBy(x => x.sektor)
-                .ToList(),
-            kategoriler
-        };
     }
 
     private static string Aile(string hizmetKimligi)
