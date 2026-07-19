@@ -177,8 +177,10 @@ public sealed class TickYoneticisi
                 tickNumarasi,
                 cancellationToken);
 
-            // Kalıcı eski fiyat ezmeleri bu noktadan sonra iş seçimini etkileyemez.
-            MotorHizmetFiyatlari.Uygula(_sirketYoneticisi.SirketKayitlari);
+            await MotorHizmetFiyatlari.KaliciEzmeKayitlariniTemizleVeUygulaAsync(
+                _isletimYoneticisi,
+                _sirketYoneticisi.SirketKayitlari,
+                cancellationToken);
 
             await _pazarFiyatYoneticisi.TickCalistirAsync(
                 tickNumarasi,
