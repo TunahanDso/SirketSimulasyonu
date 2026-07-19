@@ -1,5 +1,5 @@
 use super::HizmetHatasi;
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
 const HIZMETLER: &[&str] = &[
@@ -46,10 +46,11 @@ pub fn calistir(kimlik: &str, ham: &str) -> Result<String, HizmetHatasi> {
         "metin.birlestir" => json!({"metin": metin_dizisi(&value).join(ayirici(&value))}),
         "metin.parcala" => {
             let a = ayirici(&value);
+            let kaynak_metin = metin(&value);
             let parts: Vec<String> = if a.is_empty() {
-                metin(&value).chars().map(|x| x.to_string()).collect()
+                kaynak_metin.chars().map(|x| x.to_string()).collect()
             } else {
-                metin(&value).split(a).map(str::to_string).collect()
+                kaynak_metin.split(a).map(str::to_string).collect()
             };
             json!({"parcalar": parts})
         }
@@ -70,14 +71,24 @@ pub fn calistir(kimlik: &str, ham: &str) -> Result<String, HizmetHatasi> {
             json!({"anahtarKelimeler": entries.into_iter().take(12).map(|x| json!({"kelime":x.0,"sayi":x.1})).collect::<Vec<_>>()})
         }
         "dizi.filtrele" | "veri.filtrele" => {
-            let min = sayi_opt(&value, "min"); let max = sayi_opt(&value, "max");
-            let out: Vec<f64> = sayilar(&value).into_iter().filter(|x| min.is_none_or(|m|*x>=m)&&max.is_none_or(|m|*x<=m)).collect();
-            json!({"sonuc":out,"adet":out.len()})
+            let min = sayi_opt(&value, "min");
+            let max = sayi_opt(&value, "max");
+            let out: Vec<f64> = sayilar(&value).into_iter()
+                .filter(|x| min.is_none_or(|m| *x >= m) && max.is_none_or(|m| *x <= m))
+                .collect();
+            let adet = out.len();
+            json!({"sonuc":out,"adet":adet})
         }
         "dizi.birlestir" | "veri.birlestir" => {
-            let mut out = dizi(&value, "birinci"); out.extend(dizi(&value, "ikinci"));
-            if out.is_empty() { out = value.get("diziler").and_then(Value::as_array).map(|ds|ds.iter().flat_map(|d|d.as_array().cloned().unwrap_or_default()).collect()).unwrap_or_default(); }
-            json!({"sonuc":out,"adet":out.len()})
+            let mut out = dizi(&value, "birinci");
+            out.extend(dizi(&value, "ikinci"));
+            if out.is_empty() {
+                out = value.get("diziler").and_then(Value::as_array)
+                    .map(|ds| ds.iter().flat_map(|d| d.as_array().cloned().unwrap_or_default()).collect())
+                    .unwrap_or_default();
+            }
+            let adet = out.len();
+            json!({"sonuc":out,"adet":adet})
         }
         "dizi.kesisim" => {
             let a: BTreeSet<String> = dizi(&value,"birinci").iter().map(normal_json).collect();
@@ -90,31 +101,75 @@ pub fn calistir(kimlik: &str, ham: &str) -> Result<String, HizmetHatasi> {
             json!({"sonuc":s.into_iter().collect::<Vec<_>>()})
         }
         "dizi.parcala" => {
-            let arr=dizi_varsayilan(&value); let boy=sayi(&value,"parcaBoyutu",10.0).clamp(1.0,1000.0) as usize;
+            let arr = dizi_varsayilan(&value);
+            let boy = sayi(&value,"parcaBoyutu",10.0).clamp(1.0,1000.0) as usize;
             json!({"parcalar":arr.chunks(boy).map(|x|x.to_vec()).collect::<Vec<_>>()})
         }
         "dizi.dogrula" => {
-            let arr=dizi_varsayilan(&value); json!({"gecerli":true,"adet":arr.len(),"bos":arr.is_empty()})
+            let arr = dizi_varsayilan(&value);
+            json!({"gecerli":true,"adet":arr.len(),"bos":arr.is_empty()})
         }
         "veri.temizle" => {
-            let arr=dizi_varsayilan(&value); let temiz:Vec<Value>=arr.into_iter().filter(|x|!x.is_null()&&x.as_str().is_none_or(|s|!s.trim().is_empty())).collect();
-            json!({"sonuc":temiz,"adet":temiz.len()})
+            let arr = dizi_varsayilan(&value);
+            let temiz: Vec<Value> = arr.into_iter()
+                .filter(|x| !x.is_null() && x.as_str().is_none_or(|s| !s.trim().is_empty()))
+                .collect();
+            let adet = temiz.len();
+            json!({"sonuc":temiz,"adet":adet})
         }
         "veri.normalize-et" => {
-            let xs=sayilar(&value); if xs.is_empty(){json!({"sonuc":[]})}else{let min=xs.iter().copied().fold(f64::INFINITY,f64::min);let max=xs.iter().copied().fold(f64::NEG_INFINITY,f64::max);let span=max-min;let out:Vec<f64>=xs.iter().map(|x|if span.abs()<f64::EPSILON{0.0}else{(x-min)/span}).collect();json!({"sonuc":out,"min":min,"max":max})}
+            let xs = sayilar(&value);
+            if xs.is_empty() {
+                json!({"sonuc":[]})
+            } else {
+                let min = xs.iter().copied().fold(f64::INFINITY,f64::min);
+                let max = xs.iter().copied().fold(f64::NEG_INFINITY,f64::max);
+                let span = max-min;
+                let out: Vec<f64> = xs.iter().map(|x| if span.abs()<f64::EPSILON {0.0} else {(x-min)/span}).collect();
+                json!({"sonuc":out,"min":min,"max":max})
+            }
         }
         "veri.gruplandir" => {
-            let arr=dizi_varsayilan(&value);let alan=value.get("alan").and_then(Value::as_str).unwrap_or("tur");let mut g:BTreeMap<String,Vec<Value>>=BTreeMap::new();for x in arr{let k=x.get(alan).map(normal_json).unwrap_or_else(||"diger".into());g.entry(k).or_default().push(x);}json!({"gruplar":g})
+            let arr = dizi_varsayilan(&value);
+            let alan = value.get("alan").and_then(Value::as_str).unwrap_or("tur");
+            let mut g: BTreeMap<String,Vec<Value>> = BTreeMap::new();
+            for x in arr {
+                let k = x.get(alan).map(normal_json).unwrap_or_else(||"diger".into());
+                g.entry(k).or_default().push(x);
+            }
+            json!({"gruplar":g})
         }
         "veri.korelasyon" => {
-            let x=sayi_dizisi(&value,"x");let y=sayi_dizisi(&value,"y");let n=x.len().min(y.len());let r=if n<2{0.0}else{let ax=x[..n].iter().sum::<f64>()/n as f64;let ay=y[..n].iter().sum::<f64>()/n as f64;let mut p=0.0;let mut q=0.0;let mut z=0.0;for i in 0..n{let dx=x[i]-ax;let dy=y[i]-ay;p+=dx*dy;q+=dx*dx;z+=dy*dy;}if q*z<=0.0{0.0}else{p/(q*z).sqrt()}};json!({"korelasyon":r,"ornekSayisi":n})
+            let x=sayi_dizisi(&value,"x");
+            let y=sayi_dizisi(&value,"y");
+            let n=x.len().min(y.len());
+            let r=if n<2{0.0}else{let ax=x[..n].iter().sum::<f64>()/n as f64;let ay=y[..n].iter().sum::<f64>()/n as f64;let mut p=0.0;let mut q=0.0;let mut z=0.0;for i in 0..n{let dx=x[i]-ax;let dy=y[i]-ay;p+=dx*dy;q+=dx*dx;z+=dy*dy;}if q*z<=0.0{0.0}else{p/(q*z).sqrt()}};
+            json!({"korelasyon":r,"ornekSayisi":n})
         }
         "arama.ara" => {
-            let q=sorgu(&value).to_lowercase();let kaynak=kaynak(&value);let out:Vec<Value>=kaynak.into_iter().filter(|x|normal_json(x).to_lowercase().contains(&q)).take(100).collect();json!({"sonuclar":out,"adet":out.len()})
+            let q=sorgu(&value).to_lowercase();
+            let kaynak_veri=kaynak(&value);
+            let out:Vec<Value>=kaynak_veri.into_iter().filter(|x|normal_json(x).to_lowercase().contains(&q)).take(100).collect();
+            let adet=out.len();
+            json!({"sonuclar":out,"adet":adet})
         }
-        "arama.sirala" => {let mut out=kaynak(&value);out.sort_by_key(normal_json);json!({"sonuclar":out})}
-        "arama.otomatik-tamamla" => {let q=sorgu(&value).to_lowercase();let mut out:Vec<String>=kaynak(&value).iter().filter_map(Value::as_str).filter(|x|x.to_lowercase().starts_with(&q)).map(str::to_string).collect();out.sort();out.dedup();out.truncate(12);json!({"oneriler":out})}
-        "arama.yazim-duzelt" => {let q=sorgu(&value);json!({"duzeltilmis":q.trim().split_whitespace().collect::<Vec<_>>().join(" "),"degisti":q!=q.trim()})}
+        "arama.sirala" => {
+            let mut out=kaynak(&value);
+            out.sort_by_key(normal_json);
+            json!({"sonuclar":out})
+        }
+        "arama.otomatik-tamamla" => {
+            let q=sorgu(&value).to_lowercase();
+            let kaynak_veri=kaynak(&value);
+            let mut out:Vec<String>=kaynak_veri.iter().filter_map(Value::as_str)
+                .filter(|x|x.to_lowercase().starts_with(&q)).map(str::to_string).collect();
+            out.sort();out.dedup();out.truncate(12);
+            json!({"oneriler":out})
+        }
+        "arama.yazim-duzelt" => {
+            let q=sorgu(&value);
+            json!({"duzeltilmis":q.trim().split_whitespace().collect::<Vec<_>>().join(" "),"degisti":q!=q.trim()})
+        }
         "bildirim.push-gonder" => json!({"bildirimKimligi":kimlik_uret("push"),"durum":"kuyruga-alindi","alici":alan(&value,"alici","musteri")}),
         "bildirim.zamanla" => json!({"bildirimKimligi":kimlik_uret("scheduled"),"durum":"zamanlandi","zaman":alan(&value,"zaman","sonraki-tick")}),
         _ => return Err(HizmetHatasi::DesteklenmeyenHizmet),
