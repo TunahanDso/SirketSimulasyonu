@@ -8,11 +8,8 @@ namespace SirketMotoru.Sirketler;
 public sealed class SirketYoneticisi : IAsyncDisposable
 {
     private readonly List<SirketBaglantisi> _baglantilar;
-
     private readonly HizmetKatalogu _hizmetKatalogu;
-
-    private readonly SirketBilancoVeritabani
-        _bilancoVeritabani;
+    private readonly SirketBilancoVeritabani _bilancoVeritabani;
 
     public IReadOnlyCollection<SirketKaydi> SirketKayitlari =>
         _baglantilar
@@ -24,36 +21,23 @@ public sealed class SirketYoneticisi : IAsyncDisposable
         MotorAyarlari motorAyarlari,
         HizmetKatalogu hizmetKatalogu)
     {
-        ArgumentNullException.ThrowIfNull(
-            motorAyarlari);
+        ArgumentNullException.ThrowIfNull(motorAyarlari);
+        ArgumentNullException.ThrowIfNull(hizmetKatalogu);
+        _hizmetKatalogu = hizmetKatalogu;
+        _baglantilar = motorAyarlari.Sirketler
+            .Select(
+                sirketAyari =>
+                    new SirketBaglantisi(
+                        motorAyarlari,
+                        sirketAyari))
+            .ToList();
+        _bilancoVeritabani = new SirketBilancoVeritabani();
 
-        ArgumentNullException.ThrowIfNull(
-            hizmetKatalogu);
+        IReadOnlyDictionary<string, SirketBilancoKaydi> kaliciBilancolar =
+            _bilancoVeritabani.Yukle();
+        int yuklenenBilancoSayisi = 0;
 
-        _hizmetKatalogu =
-            hizmetKatalogu;
-
-        _baglantilar =
-            motorAyarlari.Sirketler
-                .Select(
-                    sirketAyari =>
-                        new SirketBaglantisi(
-                            motorAyarlari,
-                            sirketAyari))
-                .ToList();
-
-        _bilancoVeritabani =
-            new SirketBilancoVeritabani();
-
-        IReadOnlyDictionary<string, SirketBilancoKaydi>
-            kaliciBilancolar =
-                _bilancoVeritabani.Yukle();
-
-        int yuklenenBilancoSayisi =
-            0;
-
-        foreach (SirketBaglantisi baglanti in
-                 _baglantilar)
+        foreach (SirketBaglantisi baglanti in _baglantilar)
         {
             if (!kaliciBilancolar.TryGetValue(
                     baglanti.Kayit.SirketKimligi,
@@ -62,56 +46,42 @@ public sealed class SirketYoneticisi : IAsyncDisposable
                 continue;
             }
 
-            bilanco.Uygula(
-                baglanti.Kayit);
-
+            bilanco.Uygula(baglanti.Kayit);
             yuklenenBilancoSayisi++;
         }
 
         KonsolKayitcisi.Bilgi(
-            $"Şirket bilanço veritabanı: " +
-            $"{_bilancoVeritabani.DosyaYolu} | " +
+            $"Şirket bilanço veritabanı: {_bilancoVeritabani.DosyaYolu} | " +
             $"Yüklenen kayıt: {yuklenenBilancoSayisi}");
     }
 
-    public IReadOnlyList<SirketBaglantisi>
-        BaglantilariGetir()
+    public IReadOnlyList<SirketBaglantisi> BaglantilariGetir()
     {
-        return _baglantilar
-            .ToList()
-            .AsReadOnly();
+        return _baglantilar.ToList().AsReadOnly();
     }
 
     public async Task IlkBaglantilariKurAsync(
         CancellationToken cancellationToken)
     {
         KonsolKayitcisi.Bilgi(
-            $"{_baglantilar.Count} şirkete " +
-            "bağlantı kurulacak.");
+            $"{_baglantilar.Count} şirkete bağlantı kurulacak.");
 
-        foreach (SirketBaglantisi baglanti in
-                 _baglantilar)
+        foreach (SirketBaglantisi baglanti in _baglantilar)
         {
-            cancellationToken
-                .ThrowIfCancellationRequested();
-
+            cancellationToken.ThrowIfCancellationRequested();
             bool baglandi =
-                await baglanti.BaglanVeKaydetAsync(
-                    cancellationToken);
+                await baglanti.BaglanVeKaydetAsync(cancellationToken);
 
             if (baglandi)
             {
                 await FinansDurumunuGuvenliGonderAsync(
                     baglanti,
-                    tickNumarasi:
-                        0,
+                    0,
                     cancellationToken);
             }
         }
 
-        await BilancolariKaydetAsync(
-            cancellationToken);
-
+        await BilancolariKaydetAsync(cancellationToken);
         SirketDurumOzetiniYazdir();
     }
 
@@ -119,21 +89,17 @@ public sealed class SirketYoneticisi : IAsyncDisposable
         long tickNumarasi,
         CancellationToken cancellationToken)
     {
-        foreach (SirketBaglantisi baglanti in
-                 _baglantilar)
+        foreach (SirketBaglantisi baglanti in _baglantilar)
         {
-            cancellationToken
-                .ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
+            baglanti.Kayit.PiyasaYipranmasiUygula();
 
             if (!baglanti.Bagli)
             {
                 KonsolKayitcisi.Bilgi(
-                    $"{baglanti.Kayit.SirketAdi} için " +
-                    "yeniden bağlantı deneniyor.");
-
+                    $"{baglanti.Kayit.SirketAdi} için yeniden bağlantı deneniyor.");
                 bool baglandi =
-                    await baglanti.BaglanVeKaydetAsync(
-                        cancellationToken);
+                    await baglanti.BaglanVeKaydetAsync(cancellationToken);
 
                 if (!baglandi)
                 {
@@ -155,13 +121,7 @@ public sealed class SirketYoneticisi : IAsyncDisposable
             }
         }
 
-        /*
-         * Bu kayıt önceki tickte tamamlanan işlerin finansal
-         * etkilerini kalıcı hâle getirir. Tick sonunda da
-         * TickYoneticisi tarafından tekrar çağrılır.
-         */
-        await BilancolariKaydetAsync(
-            cancellationToken);
+        await BilancolariKaydetAsync(cancellationToken);
 
         if (tickNumarasi % 5 == 0)
         {
@@ -173,12 +133,10 @@ public sealed class SirketYoneticisi : IAsyncDisposable
         long tickNumarasi,
         CancellationToken cancellationToken)
     {
-        await BilancolariKaydetAsync(
-            cancellationToken);
+        await BilancolariKaydetAsync(cancellationToken);
 
         foreach (SirketBaglantisi baglanti in
-                 _baglantilar.Where(
-                     baglanti => baglanti.Bagli))
+                 _baglantilar.Where(baglanti => baglanti.Bagli))
         {
             await FinansDurumunuGuvenliGonderAsync(
                 baglanti,
@@ -195,10 +153,9 @@ public sealed class SirketYoneticisi : IAsyncDisposable
             cancellationToken);
     }
 
-    public IReadOnlyList<SirketKaydi>
-        HizmetSunabilenSirketleriBul(
-            string hizmetKimligi,
-            string hizmetSurumu)
+    public IReadOnlyList<SirketKaydi> HizmetSunabilenSirketleriBul(
+        string hizmetKimligi,
+        string hizmetSurumu)
     {
         if (!_hizmetKatalogu.HizmetVarMi(
                 hizmetKimligi,
@@ -209,20 +166,16 @@ public sealed class SirketYoneticisi : IAsyncDisposable
 
         return _baglantilar
             .Select(baglanti => baglanti.Kayit)
-            .Where(
-                kayit =>
-                    kayit.Durum is
-                        SirketDurumu.Bagli or
-                        SirketDurumu.Calisiyor)
+            .Where(kayit => kayit.BagliMi)
             .Where(
                 kayit =>
                     kayit.HizmetSunuyorMu(
                         hizmetKimligi,
                         hizmetSurumu))
-            .OrderBy(
-                kayit => kayit.SonGecikmeMs)
-            .ThenBy(
-                kayit => kayit.KuyrukUzunlugu)
+            .OrderByDescending(kayit => kayit.KodKalitesiPuani)
+            .ThenByDescending(kayit => kayit.PerformansPuani)
+            .ThenByDescending(kayit => kayit.GuvenlikPuani)
+            .ThenBy(kayit => kayit.SonGecikmeMs)
             .ToList()
             .AsReadOnly();
     }
@@ -265,48 +218,57 @@ public sealed class SirketYoneticisi : IAsyncDisposable
     private void SirketDurumOzetiniYazdir()
     {
         int bagliSirketSayisi =
-            _baglantilar.Count(
-                baglanti =>
-                    baglanti.Kayit.Durum is
-                        SirketDurumu.Bagli or
-                        SirketDurumu.Calisiyor);
-
+            _baglantilar.Count(baglanti => baglanti.Kayit.BagliMi);
         int toplamHizmetBildirimi =
-            _baglantilar.Sum(
-                baglanti =>
-                    baglanti.Kayit.Hizmetler.Count);
-
+            _baglantilar.Sum(baglanti => baglanti.Kayit.Hizmetler.Count);
         decimal toplamSirketKasasi =
+            _baglantilar.Sum(baglanti => baglanti.Kayit.Kasa);
+        double ortalamaKalite =
+            _baglantilar.Count == 0
+                ? 0
+                : _baglantilar.Average(
+                    baglanti => baglanti.Kayit.KodKalitesiPuani);
+        double ortalamaPerformans =
+            _baglantilar.Count == 0
+                ? 0
+                : _baglantilar.Average(
+                    baglanti => baglanti.Kayit.PerformansPuani);
+        double ortalamaGuvenlik =
+            _baglantilar.Count == 0
+                ? 0
+                : _baglantilar.Average(
+                    baglanti => baglanti.Kayit.GuvenlikPuani);
+        int toplamBasariliSaldiri =
             _baglantilar.Sum(
-                baglanti =>
-                    baglanti.Kayit.Kasa);
+                baglanti => baglanti.Kayit.BasariliSaldiriSayisi);
+        int toplamEngellenenSaldiri =
+            _baglantilar.Sum(
+                baglanti => baglanti.Kayit.EngellenenSaldiriSayisi);
 
         KonsolKayitcisi.Bilgi(
-            $"Şirket özeti | " +
-            $"Bağlı: {bagliSirketSayisi}/" +
-            $"{_baglantilar.Count} | " +
-            $"Geçerli hizmet bildirimi: " +
-            $"{toplamHizmetBildirimi} | " +
-            $"Toplam şirket kasası: " +
-            $"{toplamSirketKasasi:N2}");
+            $"Şirket özeti | Bağlı: {bagliSirketSayisi}/{_baglantilar.Count} | " +
+            $"Hizmet ilanı: {toplamHizmetBildirimi} | " +
+            $"Toplam kasa: {toplamSirketKasasi:N2} | " +
+            $"Kalite: {ortalamaKalite:N1} | " +
+            $"Performans: {ortalamaPerformans:N1} | " +
+            $"Güvenlik: {ortalamaGuvenlik:N1} | " +
+            $"Saldırı E/B: {toplamEngellenenSaldiri}/{toplamBasariliSaldiri}");
     }
 
     public async ValueTask DisposeAsync()
     {
         try
         {
-            await BilancolariKaydetAsync(
-                CancellationToken.None);
+            await BilancolariKaydetAsync(CancellationToken.None);
         }
         catch (Exception exception)
         {
             KonsolKayitcisi.Hata(
-                $"Motor kapanırken şirket bilançoları " +
-                $"kaydedilemedi: {exception.Message}");
+                $"Motor kapanırken şirket bilançoları kaydedilemedi: " +
+                exception.Message);
         }
 
-        foreach (SirketBaglantisi baglanti in
-                 _baglantilar)
+        foreach (SirketBaglantisi baglanti in _baglantilar)
         {
             await baglanti.DisposeAsync();
         }
