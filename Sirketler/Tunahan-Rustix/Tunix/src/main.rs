@@ -34,14 +34,34 @@ fn main() -> io::Result<()> {
     println!("Tunix sunucusu başlatıldı.");
     println!("Sunucu sürümü: {SUNUCU_SURUMU}");
     println!("Tunix 7001 portunda motoru bekliyor...");
-    for (kimlik, surum) in [
-        (MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU),
-        (MATEMATIK_CARP, MATEMATIK_CARP_SURUMU),
-        (VERI_ORTALAMA_HESAPLA, VERI_ORTALAMA_HESAPLA_SURUMU),
-        (METIN_KELIME_SAY, METIN_KELIME_SAY_SURUMU),
-        (METIN_KARAKTER_SAY, METIN_KARAKTER_SAY_SURUMU),
+    for (kimlik, surum, fiyat) in [
+        (
+            MATEMATIK_TOPLA,
+            MATEMATIK_TOPLA_SURUMU,
+            Decimal::new(5, 0),
+        ),
+        (
+            MATEMATIK_CARP,
+            MATEMATIK_CARP_SURUMU,
+            Decimal::new(8, 0),
+        ),
+        (
+            VERI_ORTALAMA_HESAPLA,
+            VERI_ORTALAMA_HESAPLA_SURUMU,
+            Decimal::new(15, 0),
+        ),
+        (
+            METIN_KELIME_SAY,
+            METIN_KELIME_SAY_SURUMU,
+            Decimal::new(7, 0),
+        ),
+        (
+            METIN_KARAKTER_SAY,
+            METIN_KARAKTER_SAY_SURUMU,
+            Decimal::new(4, 0),
+        ),
     ] {
-        println!("Yayınlanan hizmet: {kimlik}@{surum}");
+        println!("Yayınlanan hizmet: {kimlik}@{surum} | Fiyat: {fiyat} TL");
     }
     println!();
 
@@ -120,18 +140,30 @@ fn merhaba_mesajini_isle(
         sirket_adi: SIRKET_ADI,
         sunucu_surumu: SUNUCU_SURUMU,
         hizmetler: vec![
-            hizmet(MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU, Decimal::ONE),
-            hizmet(MATEMATIK_CARP, MATEMATIK_CARP_SURUMU, Decimal::new(2, 0)),
+            hizmet(
+                MATEMATIK_TOPLA,
+                MATEMATIK_TOPLA_SURUMU,
+                Decimal::new(5, 0),
+            ),
+            hizmet(
+                MATEMATIK_CARP,
+                MATEMATIK_CARP_SURUMU,
+                Decimal::new(8, 0),
+            ),
             hizmet(
                 VERI_ORTALAMA_HESAPLA,
                 VERI_ORTALAMA_HESAPLA_SURUMU,
-                Decimal::new(3, 0),
+                Decimal::new(15, 0),
             ),
-            hizmet(METIN_KELIME_SAY, METIN_KELIME_SAY_SURUMU, Decimal::new(2, 0)),
+            hizmet(
+                METIN_KELIME_SAY,
+                METIN_KELIME_SAY_SURUMU,
+                Decimal::new(7, 0),
+            ),
             hizmet(
                 METIN_KARAKTER_SAY,
                 METIN_KARAKTER_SAY_SURUMU,
-                Decimal::ONE,
+                Decimal::new(4, 0),
             ),
         ],
     };
