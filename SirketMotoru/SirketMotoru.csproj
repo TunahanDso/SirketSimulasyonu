@@ -27,6 +27,7 @@
     <Compile Remove="Isletim/KodTabanliSirketIsletimYoneticisi.cs" />
 
     <Compile Remove="Tick/TickYoneticisi.cs" />
+    <Compile Remove="Tick/TickYoneticisiV2.cs" />
     <Compile Remove="Musteriler/MusteriYoneticisi.cs" />
   </ItemGroup>
 
