@@ -13,6 +13,7 @@
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV2.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV3.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV4.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiSunucusu.cs" />
 
     <Compile Remove="Isletim/SirketYonetimHtml.cs" />
     <Compile Remove="Isletim/SirketYonetimHtmlV2.cs" />
