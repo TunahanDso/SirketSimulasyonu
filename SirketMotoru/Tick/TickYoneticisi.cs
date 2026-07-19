@@ -14,7 +14,7 @@ public sealed class TickYoneticisi
     private readonly MotorAyarlari _ayarlar;
     private readonly SirketYoneticisi _sirketYoneticisi;
     private readonly MusteriYoneticisi _musteriYoneticisi;
-    private readonly SirketIsletimYoneticisi _sirketIsletimYoneticisi;
+    private readonly KodTabanliSirketIsletimYoneticisi _isletimYoneticisi;
     private readonly IsYoneticisi _isYoneticisi;
     private long _tickNumarasi;
     private bool _calisiyor;
@@ -26,12 +26,12 @@ public sealed class TickYoneticisi
         MotorAyarlari ayarlar,
         SirketYoneticisi sirketYoneticisi,
         MusteriYoneticisi musteriYoneticisi,
-        SirketIsletimYoneticisi sirketIsletimYoneticisi)
+        KodTabanliSirketIsletimYoneticisi isletimYoneticisi)
     {
         ArgumentNullException.ThrowIfNull(ayarlar);
         ArgumentNullException.ThrowIfNull(sirketYoneticisi);
         ArgumentNullException.ThrowIfNull(musteriYoneticisi);
-        ArgumentNullException.ThrowIfNull(sirketIsletimYoneticisi);
+        ArgumentNullException.ThrowIfNull(isletimYoneticisi);
 
         if (ayarlar.TickSuresiSaniye <= 0)
         {
@@ -43,7 +43,7 @@ public sealed class TickYoneticisi
         _ayarlar = ayarlar;
         _sirketYoneticisi = sirketYoneticisi;
         _musteriYoneticisi = musteriYoneticisi;
-        _sirketIsletimYoneticisi = sirketIsletimYoneticisi;
+        _isletimYoneticisi = isletimYoneticisi;
         _isYoneticisi = new IsYoneticisi(
             sirketYoneticisi,
             musteriYoneticisi,
@@ -67,9 +67,9 @@ public sealed class TickYoneticisi
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                long tickNumarasi =
-                    Interlocked.Increment(ref _tickNumarasi);
-                Stopwatch tickKronometresi = Stopwatch.StartNew();
+                long tickNumarasi = Interlocked.Increment(
+                    ref _tickNumarasi);
+                Stopwatch kronometre = Stopwatch.StartNew();
                 KonsolKayitcisi.Tick(tickNumarasi);
 
                 try
@@ -92,15 +92,15 @@ public sealed class TickYoneticisi
                 }
                 finally
                 {
-                    tickKronometresi.Stop();
+                    kronometre.Stop();
                 }
 
                 KonsolKayitcisi.Bilgi(
                     $"Tick {tickNumarasi} tamamlandı. İşlem süresi: " +
-                    $"{tickKronometresi.Elapsed.TotalMilliseconds:N2} ms.");
+                    $"{kronometre.Elapsed.TotalMilliseconds:N2} ms.");
 
                 TimeSpan beklemeSuresi =
-                    TickBeklemeSuresiniHesapla(tickKronometresi.Elapsed);
+                    TickBeklemeSuresiniHesapla(kronometre.Elapsed);
 
                 if (beklemeSuresi <= TimeSpan.Zero)
                 {
@@ -135,46 +135,48 @@ public sealed class TickYoneticisi
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        // 1. Müşteri gelirleri ve dönemsel durumları güncellenir.
-        _musteriYoneticisi.TickBasindaMusterileriGuncelle(tickNumarasi);
+        // 1. Müşteriler ve dönemsel bütçeler güncellenir.
+        _musteriYoneticisi.TickBasindaMusterileriGuncelle(
+            tickNumarasi);
 
-        // 2. Şirket bağlantıları ve sağlık durumları güncellenir.
+        // 2. Şirket TCP bağlantıları ve sağlık durumları güncellenir.
         await _sirketYoneticisi.TickCalistirAsync(
             tickNumarasi,
             cancellationToken);
 
-        // 3. Altyapı gideri, kredi, ürün, abonelik, protokol,
-        //    sözleşme, piyasa olayı ve şirket değerlemesi işlenir.
-        await _sirketIsletimYoneticisi.TickCalistirAsync(
+        // 3. Koddan ilan edilen hizmet/uygulama/protokol durumu,
+        //    yatırımlar, krediler, abonelikler ve sözleşmeler işlenir.
+        await _isletimYoneticisi.TickCalistirAsync(
             tickNumarasi,
             cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // 4. Müşteri hizmet talepleri oluşturulur.
+        // 4. Motorun standart iş piyasası talepleri oluşturulur.
         IReadOnlyList<HizmetTalebi> talepler =
-            _musteriYoneticisi.TickTalepleriniOlustur(tickNumarasi);
+            _musteriYoneticisi.TickTalepleriniOlustur(
+                tickNumarasi);
 
         CanliPanoDurumDeposu.TalepleriGuncelle(
             tickNumarasi,
             talepler);
         TalepleriRaporla(tickNumarasi, talepler);
 
-        // 5. Talepler şirketlere atanır, sonuçlar doğrulanır.
+        // 5. İşler sunuculara gönderilir ve sonuçlar doğrulanır.
         IsIslemeOzeti islemeOzeti =
             await _isYoneticisi.TalepleriIsleAsync(
                 tickNumarasi,
                 talepler,
                 cancellationToken);
 
-        CanliPanoDurumDeposu.IslemeOzetiniGuncelle(islemeOzeti);
+        CanliPanoDurumDeposu.IslemeOzetiniGuncelle(
+            islemeOzeti);
 
-        // 6. Güncel finans durumları kalıcı yazılır ve yayınlanır.
+        // 6. Finans durumu kalıcı yazılır ve şirketlere gönderilir.
         await _sirketYoneticisi.BilancolariKaydetVeYayinlaAsync(
             tickNumarasi,
             cancellationToken);
 
-        // 7. Müşteri kayıtları periyodik kaydedilir.
         await _musteriYoneticisi.GerekirseKaydetAsync(
             tickNumarasi,
             cancellationToken);
@@ -195,7 +197,7 @@ public sealed class TickYoneticisi
             return;
         }
 
-        IEnumerable<IGrouping<string, HizmetTalebi>> hizmetGruplari =
+        IEnumerable<IGrouping<string, HizmetTalebi>> gruplar =
             talepler
                 .GroupBy(
                     talep =>
@@ -210,15 +212,15 @@ public sealed class TickYoneticisi
             $"Tick {tickNumarasi} | Toplam {talepler.Count} " +
             "müşteri talebi oluşturuldu.");
 
-        foreach (IGrouping<string, HizmetTalebi> grup in hizmetGruplari)
+        foreach (IGrouping<string, HizmetTalebi> grup in gruplar)
         {
-            decimal toplamAzamiButce =
-                grup.Sum(talep => talep.AzamiButce);
+            decimal toplamAzamiButce = grup.Sum(
+                talep => talep.AzamiButce);
 
             KonsolKayitcisi.Bilgi(
-                $"Talep grubu: {grup.Key} | Talep sayısı: " +
-                $"{grup.Count()} | Toplam azami bütçe: " +
-                $"{toplamAzamiButce:N2}");
+                $"Talep grubu: {grup.Key} | " +
+                $"Talep sayısı: {grup.Count()} | " +
+                $"Toplam azami bütçe: {toplamAzamiButce:N2}");
         }
     }
 
@@ -226,19 +228,22 @@ public sealed class TickYoneticisi
         long tickNumarasi,
         IReadOnlyList<HizmetTalebi> talepler)
     {
-        int aktifMusteriSayisi = _musteriYoneticisi.AktifMusteriSayisi;
+        int aktifMusteriSayisi =
+            _musteriYoneticisi.AktifMusteriSayisi;
         decimal toplamMusteriBakiyesi =
             _musteriYoneticisi.ToplamMusteriBakiyesi;
         decimal toplamMusteriHarcamasi =
             _musteriYoneticisi.ToplamMusteriHarcamasi;
-        decimal toplamTalepButcesi =
-            talepler.Sum(talep => talep.AzamiButce);
+        decimal toplamTalepButcesi = talepler.Sum(
+            talep => talep.AzamiButce);
         decimal toplamSirketKasasi =
-            _sirketYoneticisi.SirketKayitlari.Sum(sirket => sirket.Kasa);
+            _sirketYoneticisi.SirketKayitlari.Sum(
+                sirket => sirket.Kasa);
 
         KonsolKayitcisi.Bilgi(
-            $"Tick {tickNumarasi} özeti | Aktif müşteri: " +
-            $"{aktifMusteriSayisi} | Yeni talep: {talepler.Count} | " +
+            $"Tick {tickNumarasi} özeti | " +
+            $"Aktif müşteri: {aktifMusteriSayisi} | " +
+            $"Yeni talep: {talepler.Count} | " +
             $"Talep bütçesi: {toplamTalepButcesi:N2} | " +
             $"Müşteri bakiyesi: {toplamMusteriBakiyesi:N2} | " +
             $"Toplam harcama: {toplamMusteriHarcamasi:N2} | " +
@@ -248,8 +253,8 @@ public sealed class TickYoneticisi
     private TimeSpan TickBeklemeSuresiniHesapla(
         TimeSpan tickIslemSuresi)
     {
-        TimeSpan hedefTickSuresi =
-            TimeSpan.FromSeconds(_ayarlar.TickSuresiSaniye);
+        TimeSpan hedefTickSuresi = TimeSpan.FromSeconds(
+            _ayarlar.TickSuresiSaniye);
         return hedefTickSuresi - tickIslemSuresi;
     }
 
@@ -257,7 +262,8 @@ public sealed class TickYoneticisi
     {
         try
         {
-            await _musteriYoneticisi.KaydetAsync(CancellationToken.None);
+            await _musteriYoneticisi.KaydetAsync(
+                CancellationToken.None);
             await _sirketYoneticisi.BilancolariKaydetAsync(
                 CancellationToken.None);
 
