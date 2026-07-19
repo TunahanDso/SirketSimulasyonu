@@ -103,9 +103,21 @@ try
     await using SirketYoneticisi sirketYoneticisi =
         new(motorAyarlari, hizmetKatalogu);
 
+    // İşletim yöneticisi dosyayı belleğe almadan önce ilk hesap
+    // migrasyonları uygulanır. Değiştirilmiş kullanıcı parolalarına dokunulmaz.
+    await BaslangicMigrasyonlari.YonetimHesaplariniHazirlaAsync(
+        motorVerileriKlasoru,
+        iptalKaynagi.Token);
+
     await using KodTabanliSirketIsletimYoneticisi isletimYoneticisi =
         new(sirketYoneticisi, motorVerileriKlasoru);
     await isletimYoneticisi.BaslatAsync(iptalKaynagi.Token);
+
+    // Bu destek ayrı kalıcı işaret dosyasıyla yalnızca bir kez uygulanır.
+    await BaslangicMigrasyonlari.TekSeferlikFinansmanDestekleriniUygulaAsync(
+        sirketYoneticisi,
+        motorVerileriKlasoru,
+        iptalKaynagi.Token);
 
     TickYoneticisi tickYoneticisi = new(
         motorAyarlari,
