@@ -1,8 +1,9 @@
+using System.Text.Json.Serialization;
 using SirketMotoru.Hizmetler;
 
 namespace SirketMotoru.Protokol;
 
-public sealed class SirketTanitimMesaji
+public sealed class SirketTanitimMesaji : IJsonOnDeserialized
 {
     public string MesajTuru { get; init; } =
         MesajTurleri.SirketTanitim;
@@ -24,4 +25,18 @@ public sealed class SirketTanitimMesaji
 
     public List<SunulanHizmet> Hizmetler { get; init; } =
         [];
+
+    public List<SunulanUygulama> Uygulamalar { get; init; } =
+        [];
+
+    public List<SunulanOzelProtokol> OzelProtokoller { get; init; } =
+        [];
+
+    public void OnDeserialized()
+    {
+        SunucuYayinManifestDeposu.Guncelle(
+            SirketKimligi,
+            Uygulamalar,
+            OzelProtokoller);
+    }
 }
