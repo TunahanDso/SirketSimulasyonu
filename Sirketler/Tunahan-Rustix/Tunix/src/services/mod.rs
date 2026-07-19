@@ -1,13 +1,23 @@
+mod dizi_sirala;
+mod matematik_asal_carpanlar;
 mod matematik_carp;
 mod matematik_topla;
+mod metin_frekans_analizi;
 mod metin_karakter_say;
 mod metin_kelime_say;
+mod veri_medyan_hesapla;
 mod veri_ortalama_hesapla;
+mod veri_standart_sapma;
 
 use crate::protocol::{
-    MATEMATIK_CARP, MATEMATIK_CARP_SURUMU, MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU,
-    METIN_KARAKTER_SAY, METIN_KARAKTER_SAY_SURUMU, METIN_KELIME_SAY,
-    METIN_KELIME_SAY_SURUMU, VERI_ORTALAMA_HESAPLA, VERI_ORTALAMA_HESAPLA_SURUMU,
+    DIZI_SIRALA, DIZI_SIRALA_SURUMU, MATEMATIK_ASAL_CARPANLAR,
+    MATEMATIK_ASAL_CARPANLAR_SURUMU, MATEMATIK_CARP, MATEMATIK_CARP_SURUMU,
+    MATEMATIK_TOPLA, MATEMATIK_TOPLA_SURUMU, METIN_FREKANS_ANALIZI,
+    METIN_FREKANS_ANALIZI_SURUMU, METIN_KARAKTER_SAY, METIN_KARAKTER_SAY_SURUMU,
+    METIN_KELIME_SAY, METIN_KELIME_SAY_SURUMU, VERI_MEDYAN_HESAPLA,
+    VERI_MEDYAN_HESAPLA_SURUMU, VERI_ORTALAMA_HESAPLA,
+    VERI_ORTALAMA_HESAPLA_SURUMU, VERI_STANDART_SAPMA,
+    VERI_STANDART_SAPMA_SURUMU,
 };
 
 #[derive(Debug)]
@@ -66,6 +76,21 @@ pub fn hizmeti_calistir(
         }
         (METIN_KARAKTER_SAY, METIN_KARAKTER_SAY_SURUMU) => {
             metin_karakter_say::calistir(istek_verisi_json)
+        }
+        (VERI_MEDYAN_HESAPLA, VERI_MEDYAN_HESAPLA_SURUMU) => {
+            veri_medyan_hesapla::calistir(istek_verisi_json)
+        }
+        (VERI_STANDART_SAPMA, VERI_STANDART_SAPMA_SURUMU) => {
+            veri_standart_sapma::calistir(istek_verisi_json)
+        }
+        (DIZI_SIRALA, DIZI_SIRALA_SURUMU) => {
+            dizi_sirala::calistir(istek_verisi_json)
+        }
+        (MATEMATIK_ASAL_CARPANLAR, MATEMATIK_ASAL_CARPANLAR_SURUMU) => {
+            matematik_asal_carpanlar::calistir(istek_verisi_json)
+        }
+        (METIN_FREKANS_ANALIZI, METIN_FREKANS_ANALIZI_SURUMU) => {
+            metin_frekans_analizi::calistir(istek_verisi_json)
         }
         _ => Err(HizmetHatasi::DesteklenmeyenHizmet),
     }
