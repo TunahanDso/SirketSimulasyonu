@@ -8,14 +8,23 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Yeni kararlı sürümler aynı sınıf adlarını kullanır. -->
+    <!-- Nihai sürümler aynı sınıf adlarını kullanır; eski ve ara sürümler derlenmez. -->
     <Compile Remove="CanliPano/YazilimBorsasiHtml.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV2.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV3.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV4.cs" />
+
     <Compile Remove="Isletim/SirketYonetimHtml.cs" />
     <Compile Remove="Isletim/SirketYonetimHtmlV2.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV3.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV4.cs" />
+
     <Compile Remove="Isletim/SirketYonetimSunucusu.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusuV2.cs" />
     <Compile Remove="Isletim/SirketIsletimYoneticisi.cs" />
     <Compile Remove="Isletim/KodTabanliSirketIsletimYoneticisi.cs" />
+
+    <Compile Remove="Tick/TickYoneticisi.cs" />
     <Compile Remove="Musteriler/MusteriYoneticisi.cs" />
   </ItemGroup>
 
