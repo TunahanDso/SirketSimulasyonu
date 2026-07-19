@@ -1,3 +1,4 @@
+using System.Reflection;
 using SirketMotoru.Protokol;
 using SirketMotoru.Sirketler;
 
@@ -77,6 +78,67 @@ public static class MotorHizmetFiyatlari
             {
                 hizmet.BirimFiyat = Fiyat(hizmet.HizmetKimligi, hizmet.HizmetSurumu);
             }
+        }
+    }
+
+    public static async Task KaliciEzmeKayitlariniTemizleVeUygulaAsync(
+        KodTabanliSirketIsletimYoneticisi isletim,
+        IEnumerable<SirketKaydi> sirketler,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(isletim);
+        ArgumentNullException.ThrowIfNull(sirketler);
+
+        FieldInfo temelAlani = typeof(KodTabanliSirketIsletimYoneticisi)
+            .GetField("_temel", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Sabit fiyat temel yönetici alanı bulunamadı.");
+        object temel = temelAlani.GetValue(isletim)
+            ?? throw new InvalidOperationException("Sabit fiyat temel yöneticisi boş.");
+        Type tur = temel.GetType();
+        FieldInfo veriAlani = tur.GetField("_veri", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Sabit fiyat işletim verisi bulunamadı.");
+        FieldInfo kilitAlani = tur.GetField("_kilit", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Sabit fiyat işletim kilidi bulunamadı.");
+        MethodInfo kaydetMetodu = tur.GetMethod("TumunuKaydetAsync", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Sabit fiyat kayıt metodu bulunamadı.");
+
+        SemaphoreSlim kilit = (SemaphoreSlim)(kilitAlani.GetValue(temel)
+            ?? throw new InvalidOperationException("Sabit fiyat kilidi boş."));
+        await kilit.WaitAsync(cancellationToken);
+        try
+        {
+            SirketIsletimDosyasi veri = (SirketIsletimDosyasi)(veriAlani.GetValue(temel)
+                ?? throw new InvalidOperationException("Sabit fiyat verisi boş."));
+            Dictionary<string, SirketKaydi> sirketIndeksi = sirketler
+                .ToDictionary(x => x.SirketKimligi, StringComparer.OrdinalIgnoreCase);
+
+            foreach (SirketIsletimDurumu durum in veri.Sirketler)
+            {
+                durum.HizmetAyarlari ??= new(StringComparer.OrdinalIgnoreCase);
+                durum.HizmetFiyatEzmeDegerleri ??= new(StringComparer.OrdinalIgnoreCase);
+                if (!sirketIndeksi.TryGetValue(durum.SirketKimligi, out SirketKaydi? sirket))
+                    continue;
+
+                foreach (SunulanHizmet hizmet in sirket.Hizmetler)
+                {
+                    string anahtar = $"{hizmet.HizmetKimligi.Trim()}@{hizmet.HizmetSurumu.Trim()}";
+                    decimal fiyat = Fiyat(hizmet.HizmetKimligi, hizmet.HizmetSurumu);
+                    hizmet.BirimFiyat = fiyat;
+                    durum.HizmetFiyatEzmeDegerleri[anahtar] = fiyat;
+                    if (!durum.HizmetAyarlari.TryGetValue(anahtar, out HizmetKaliciAyari? ayar))
+                        continue;
+                    ayar.SunucudanGelenIlkFiyat = fiyat;
+                    ayar.YonetilenFiyat = fiyat;
+                    ayar.FiyatYonetildi = false;
+                }
+            }
+
+            object? sonuc = kaydetMetodu.Invoke(temel, [cancellationToken]);
+            if (sonuc is Task gorev) await gorev;
+        }
+        finally
+        {
+            kilit.Release();
         }
     }
 }
