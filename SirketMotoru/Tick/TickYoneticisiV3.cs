@@ -20,6 +20,7 @@ public sealed class TickYoneticisi
     private readonly PazarFiyatYoneticisi _pazarFiyatYoneticisi;
     private readonly PazarGelirDuzeltmeYoneticisi _pazarGelirDuzeltmeYoneticisi;
     private readonly EkonomiV6Yoneticisi _ekonomiV6Yoneticisi;
+    private readonly EkonomiDengeV7Yoneticisi _ekonomiDengeV7Yoneticisi;
     private readonly FinansV7Yoneticisi _finansV7Yoneticisi;
     private readonly IsYoneticisi _isYoneticisi;
     private long _tickNumarasi;
@@ -38,6 +39,7 @@ public sealed class TickYoneticisi
         PazarFiyatYoneticisi pazarFiyatYoneticisi,
         PazarGelirDuzeltmeYoneticisi pazarGelirDuzeltmeYoneticisi,
         EkonomiV6Yoneticisi ekonomiV6Yoneticisi,
+        EkonomiDengeV7Yoneticisi ekonomiDengeV7Yoneticisi,
         FinansV7Yoneticisi finansV7Yoneticisi)
     {
         _ayarlar = ayarlar ?? throw new ArgumentNullException(nameof(ayarlar));
@@ -49,6 +51,7 @@ public sealed class TickYoneticisi
         _pazarFiyatYoneticisi = pazarFiyatYoneticisi ?? throw new ArgumentNullException(nameof(pazarFiyatYoneticisi));
         _pazarGelirDuzeltmeYoneticisi = pazarGelirDuzeltmeYoneticisi ?? throw new ArgumentNullException(nameof(pazarGelirDuzeltmeYoneticisi));
         _ekonomiV6Yoneticisi = ekonomiV6Yoneticisi ?? throw new ArgumentNullException(nameof(ekonomiV6Yoneticisi));
+        _ekonomiDengeV7Yoneticisi = ekonomiDengeV7Yoneticisi ?? throw new ArgumentNullException(nameof(ekonomiDengeV7Yoneticisi));
         _finansV7Yoneticisi = finansV7Yoneticisi ?? throw new ArgumentNullException(nameof(finansV7Yoneticisi));
         if (ayarlar.TickSuresiSaniye <= 0) throw new ArgumentOutOfRangeException(nameof(ayarlar));
         _isYoneticisi = new IsYoneticisi(sirketYoneticisi, musteriYoneticisi, new SonucDogrulayicisi());
@@ -103,6 +106,7 @@ public sealed class TickYoneticisi
         _musteriIsletimSistemiYoneticisi.TickCalistir(tickNumarasi);
 
         await _finansV7Yoneticisi.TickOncesiAsync(tickNumarasi, cancellationToken);
+        await _ekonomiDengeV7Yoneticisi.TickOncesiAsync(cancellationToken);
         await _ekonomiV6Yoneticisi.TickOncesiAsync(tickNumarasi, cancellationToken);
         await _pazarGelirDuzeltmeYoneticisi.TickOncesiHazirlaAsync(tickNumarasi, cancellationToken);
         await _isletimYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
@@ -116,6 +120,7 @@ public sealed class TickYoneticisi
         CanliPanoDurumDeposu.IslemeOzetiniGuncelle(islemeOzeti);
 
         await _ekonomiV6Yoneticisi.TickSonuAsync(tickNumarasi, cancellationToken);
+        await _ekonomiDengeV7Yoneticisi.TickSonuAsync(tickNumarasi, cancellationToken);
         await _finansV7Yoneticisi.TickSonuAsync(tickNumarasi, cancellationToken);
         await _sirketYoneticisi.BilancolariKaydetVeYayinlaAsync(tickNumarasi, cancellationToken);
         await _musteriYoneticisi.GerekirseKaydetAsync(tickNumarasi, cancellationToken);
