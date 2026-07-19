@@ -65,6 +65,10 @@ try
         motorVerileriKlasoru);
     await ekonomiV6Yoneticisi.BaslatAsync(iptalKaynagi.Token);
 
+    EkonomiDengeV7Yoneticisi ekonomiDengeV7Yoneticisi = new(
+        sirketYoneticisi,
+        isletimYoneticisi);
+
     await using FinansV7Yoneticisi finansV7Yoneticisi = new(
         sirketYoneticisi,
         isletimYoneticisi,
@@ -83,6 +87,7 @@ try
         pazarFiyatYoneticisi,
         pazarGelirDuzeltmeYoneticisi,
         ekonomiV6Yoneticisi,
+        ekonomiDengeV7Yoneticisi,
         finansV7Yoneticisi);
 
     await using YazilimBorsasiSunucusu yazilimBorsasiSunucusu = new(
