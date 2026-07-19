@@ -69,7 +69,6 @@ pub fn hizmeti_calistir(
         (MATEMATIK_ASAL_CARPANLAR, MATEMATIK_ASAL_CARPANLAR_SURUMU) => matematik_asal_carpanlar::calistir(istek_verisi_json),
         (METIN_FREKANS_ANALIZI, METIN_FREKANS_ANALIZI_SURUMU) => metin_frekans_analizi::calistir(istek_verisi_json),
 
-        // Motorun V6 standart hizmet kimlikleri, Tunix'in gerçekten çalışan koduna bağlanır.
         ("kimlik.oturum-dogrula", "1.0") => platform_release::calistir("tunix.kimlik.dogrula", istek_verisi_json),
         ("profil.profil-getir", "1.0") => platform_release::calistir("tunix.tingram.profil.getir", istek_verisi_json),
         ("sosyal.gonderi-olustur", "1.0") => platform_release::calistir("tunix.tingram.gonderi.olustur", istek_verisi_json),
@@ -83,6 +82,11 @@ pub fn hizmeti_calistir(
         ("eposta.spam-kontrol", "1.0") => platform_release::calistir("tunix.tmail.spam-kontrol", istek_verisi_json),
         ("eposta.ek-yukle", "1.0") => platform_release::calistir("tunix.tmail.ek-yukle", istek_verisi_json),
         ("eposta.klasor-olustur", "1.0") => platform_release::calistir("tunix.tmail.klasor", istek_verisi_json),
+
+        // Tlink de katalogdaki standart yetkinlikleri uygular.
+        ("kimlik.token-dogrula", "1.0") => platform_release::calistir("tunix.tlink.kimlik", istek_verisi_json),
+        ("dosya.sikistir", "1.0") => platform_release::calistir("tunix.tlink.paketle", istek_verisi_json),
+        ("guvenlik.baglanti-dogrula", "1.0") => platform_release::calistir("tunix.tlink.dogrula", istek_verisi_json),
 
         (kimlik, "1.0") if kimlik.starts_with("isletim.")
             || kimlik == "kimlik.kullanici-dogrula"
