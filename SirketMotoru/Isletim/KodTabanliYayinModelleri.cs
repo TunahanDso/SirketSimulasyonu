@@ -31,6 +31,11 @@ public sealed class UygulamaYayinlaIstegi
     public string FiyatlandirmaModeli { get; set; } = "abonelik";
     public decimal AbonelikUcreti { get; set; }
     public decimal KullanimBasinaUcret { get; set; }
+
+    // V8.2: ürün tek düğmeyle oluşturulur ve aynı işlemde dağıtımı bağlanır.
+    public string IsletimSistemiKimligi { get; set; } = string.Empty;
+    public string BaglantiProtokoluKimligi { get; set; } = string.Empty;
+    public bool AktifOlmasiIsteniyor { get; set; } = true;
 }
 
 public sealed class ProtokolYayinlaIstegi
