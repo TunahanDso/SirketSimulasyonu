@@ -9,7 +9,7 @@ namespace SirketMotoru.Isletim;
 
 public sealed class EkosistemDosyasi
 {
-    public int Surum { get; set; } = 1;
+    public int Surum { get; set; } = 2;
     public DateTimeOffset GuncellenmeZamani { get; set; } = DateTimeOffset.UtcNow;
     public Dictionary<string, SirketEkosistemAyarlari> Sirketler { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
@@ -90,21 +90,18 @@ public static class IsletimSistemiPazarDeposu
 
     public static IReadOnlyList<IsletimSistemiPazarKaydi> Getir()
     {
-        lock (Kilit)
-        {
-            return _kayitlar.Select(Kopyala).ToList().AsReadOnly();
-        }
+        lock (Kilit) return _kayitlar.Select(Kopyala).ToList().AsReadOnly();
     }
 
     public static void Guncelle(IEnumerable<IsletimSistemiPazarKaydi> kayitlar)
     {
         lock (Kilit)
         {
-            _kayitlar = kayitlar.Select(k =>
+            _kayitlar = kayitlar.Select(x =>
             {
-                IsletimSistemiPazarKaydi c = Kopyala(k);
-                c.AktifMusteriSayisi = _musteriDagilimi.TryGetValue(c.UygulamaKimligi, out int sayi) ? sayi : 0;
-                return c;
+                IsletimSistemiPazarKaydi kopya = Kopyala(x);
+                kopya.AktifMusteriSayisi = _musteriDagilimi.TryGetValue(kopya.UygulamaKimligi, out int sayi) ? sayi : 0;
+                return kopya;
             }).ToList().AsReadOnly();
         }
     }
@@ -119,13 +116,13 @@ public static class IsletimSistemiPazarDeposu
         }
     }
 
-    private static IsletimSistemiPazarKaydi Kopyala(IsletimSistemiPazarKaydi k) => new()
+    private static IsletimSistemiPazarKaydi Kopyala(IsletimSistemiPazarKaydi x) => new()
     {
-        SirketKimligi = k.SirketKimligi, SirketAdi = k.SirketAdi, UrunKimligi = k.UrunKimligi,
-        UygulamaKimligi = k.UygulamaKimligi, UygulamaAdi = k.UygulamaAdi, Surum = k.Surum,
-        Protokoller = k.Protokoller.ToList().AsReadOnly(), KullaniciKapasitesi = k.KullaniciKapasitesi,
-        AktifMusteriSayisi = k.AktifMusteriSayisi, Fiyat = k.Fiyat, Kalite = k.Kalite,
-        Performans = k.Performans, Guvenlik = k.Guvenlik, OperasyonRiski = k.OperasyonRiski, Aktif = k.Aktif
+        SirketKimligi = x.SirketKimligi, SirketAdi = x.SirketAdi, UrunKimligi = x.UrunKimligi,
+        UygulamaKimligi = x.UygulamaKimligi, UygulamaAdi = x.UygulamaAdi, Surum = x.Surum,
+        Protokoller = x.Protokoller.ToList().AsReadOnly(), KullaniciKapasitesi = x.KullaniciKapasitesi,
+        AktifMusteriSayisi = x.AktifMusteriSayisi, Fiyat = x.Fiyat, Kalite = x.Kalite,
+        Performans = x.Performans, Guvenlik = x.Guvenlik, OperasyonRiski = x.OperasyonRiski, Aktif = x.Aktif
     };
 }
 
@@ -140,25 +137,27 @@ public sealed class MusteriIsletimSistemiYoneticisi
     public void TickCalistir(long tickNumarasi)
     {
         IReadOnlyList<IsletimSistemiPazarKaydi> sistemler = IsletimSistemiPazarDeposu.Getir()
-            .Where(x => x.Aktif && x.KullaniciKapasitesi > 0 && x.Protokoller.Count > 0)
-            .ToList();
+            .Where(x => x.Aktif && x.KullaniciKapasitesi > 0 && x.Protokoller.Count > 0).ToList();
         Dictionary<string, int> dagilim = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, IsletimSistemiPazarKaydi> indeks = sistemler.ToDictionary(x => x.UygulamaKimligi, StringComparer.OrdinalIgnoreCase);
 
-        foreach (Musteri musteri in _musteriler.Musteriler.Where(m => m.Aktif))
+        foreach (Musteri musteri in _musteriler.Musteriler.Where(x => x.Aktif))
         {
-            bool mevcutGecerli = !string.IsNullOrWhiteSpace(musteri.IsletimSistemiKimligi) &&
-                                indeks.TryGetValue(musteri.IsletimSistemiKimligi, out IsletimSistemiPazarKaydi? mevcut);
-            if (mevcutGecerli && mevcut is not null)
+            IsletimSistemiPazarKaydi? mevcut = null;
+            if (!string.IsNullOrWhiteSpace(musteri.IsletimSistemiKimligi))
+                indeks.TryGetValue(musteri.IsletimSistemiKimligi, out mevcut);
+
+            bool mevcutGecerli = mevcut is not null;
+            if (mevcut is not null)
             {
                 dagilim.TryGetValue(mevcut.UygulamaKimligi, out int mevcutSayi);
                 if (mevcutSayi >= mevcut.KullaniciKapasitesi) mevcutGecerli = false;
                 else
                 {
-                    double memHedef = Math.Clamp((mevcut.Kalite + mevcut.Performans + mevcut.Guvenlik) / 3d - mevcut.OperasyonRiski * 0.22, 0, 100);
-                    musteri.IsletimSistemiMemnuniyeti += (memHedef - musteri.IsletimSistemiMemnuniyeti) * 0.035;
-                    double degisimOlasiligi = 0.0015 + Math.Max(0, 58 - musteri.IsletimSistemiMemnuniyeti) / 2_500d + mevcut.OperasyonRiski / 18_000d;
-                    if (tickNumarasi - musteri.SonIsletimSistemiDegisimTicki > 5 && _rastgele.NextDouble() < degisimOlasiligi)
+                    double hedef = Math.Clamp((mevcut.Kalite + mevcut.Performans + mevcut.Guvenlik) / 3d - mevcut.OperasyonRiski * 0.22, 0, 100);
+                    musteri.IsletimSistemiMemnuniyeti += (hedef - musteri.IsletimSistemiMemnuniyeti) * 0.035;
+                    double degisim = 0.0015 + Math.Max(0, 58 - musteri.IsletimSistemiMemnuniyeti) / 2_500d + mevcut.OperasyonRiski / 18_000d;
+                    if (tickNumarasi - musteri.SonIsletimSistemiDegisimTicki > 5 && _rastgele.NextDouble() < degisim)
                         mevcutGecerli = false;
                 }
             }
@@ -184,14 +183,10 @@ public sealed class MusteriIsletimSistemiYoneticisi
             dagilim.TryGetValue(secilen.UygulamaKimligi, out int sayi);
             dagilim[secilen.UygulamaKimligi] = sayi + 1;
         }
-
         IsletimSistemiPazarDeposu.MusteriDagiliminiGuncelle(dagilim);
     }
 
-    private IsletimSistemiPazarKaydi? SistemSec(
-        IReadOnlyList<IsletimSistemiPazarKaydi> sistemler,
-        IReadOnlyDictionary<string, int> dagilim,
-        Musteri musteri)
+    private IsletimSistemiPazarKaydi? SistemSec(IReadOnlyList<IsletimSistemiPazarKaydi> sistemler, IReadOnlyDictionary<string, int> dagilim, Musteri musteri)
     {
         List<(IsletimSistemiPazarKaydi Sistem, double Agirlik)> adaylar = [];
         foreach (IsletimSistemiPazarKaydi sistem in sistemler)
@@ -202,17 +197,11 @@ public sealed class MusteriIsletimSistemiYoneticisi
             double teknik = (sistem.Kalite * 0.32 + sistem.Performans * 0.28 + sistem.Guvenlik * 0.30) / 100d;
             double fiyat = 1d / (1d + (double)Math.Max(0, sistem.Fiyat) / Math.Max(10d, (double)musteri.TickBasinaHarcamaButcesi));
             double risk = Math.Clamp(1 - sistem.OperasyonRiski / 115d, 0.08, 1);
-            double agirlik = Math.Max(0.001, teknik * fiyat * risk * Math.Sqrt(bosluk) * (0.85 + _rastgele.NextDouble() * 0.3));
-            adaylar.Add((sistem, agirlik));
+            adaylar.Add((sistem, Math.Max(0.001, teknik * fiyat * risk * Math.Sqrt(bosluk) * (0.85 + _rastgele.NextDouble() * 0.3))));
         }
         if (adaylar.Count == 0) return null;
-        double toplam = adaylar.Sum(x => x.Agirlik);
-        double secim = _rastgele.NextDouble() * toplam;
-        foreach (var aday in adaylar)
-        {
-            secim -= aday.Agirlik;
-            if (secim <= 0) return aday.Sistem;
-        }
+        double secim = _rastgele.NextDouble() * adaylar.Sum(x => x.Agirlik);
+        foreach (var aday in adaylar) { secim -= aday.Agirlik; if (secim <= 0) return aday.Sistem; }
         return adaylar[^1].Sistem;
     }
 }
@@ -237,8 +226,8 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
 
     public EkosistemYoneticisi(SirketYoneticisi sirketler, KodTabanliSirketIsletimYoneticisi isletim, string motorVerileriKlasoru)
     {
-        _sirketler = sirketler;
-        _isletim = isletim;
+        _sirketler = sirketler ?? throw new ArgumentNullException(nameof(sirketler));
+        _isletim = isletim ?? throw new ArgumentNullException(nameof(isletim));
         _dosyaYolu = Path.Combine(Path.GetFullPath(motorVerileriKlasoru), "ekosistem.json");
     }
 
@@ -253,7 +242,13 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
                 string json = await File.ReadAllTextAsync(_dosyaYolu, cancellationToken);
                 _veri = JsonSerializer.Deserialize<EkosistemDosyasi>(json, JsonAyarlari) ?? new();
             }
+            _veri.Surum = 2;
             _veri.Sirketler ??= new(StringComparer.OrdinalIgnoreCase);
+            foreach (SirketEkosistemAyarlari ayar in _veri.Sirketler.Values)
+            {
+                ayar.Urunler ??= new(StringComparer.OrdinalIgnoreCase);
+                ayar.OtomatikDuraklatilanHizmetler ??= [];
+            }
             await KaydetKilitsizAsync(cancellationToken);
             _baslatildi = true;
             KonsolKayitcisi.Basari("İşletim sistemi, protokol ve aşırı yük ekosistemi hazır.");
@@ -267,41 +262,29 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
         try
         {
             _tick = tickNumarasi;
+            Dictionary<string, JsonObject> paneller = new(StringComparer.OrdinalIgnoreCase);
+            foreach (SirketKaydi sirket in _sirketler.SirketKayitlari)
+                paneller[sirket.SirketKimligi] = await PanelOkuAsync(sirket.SirketKimligi, cancellationToken);
+
+            HashSet<string> aktifProtokoller = AktifProtokolleriBul(paneller);
             List<IsletimSistemiPazarKaydi> sistemler = [];
+
+            // İlk geçiş: işletim sistemi ürünleri doğrulanır ve pazar kurulur.
             foreach (SirketKaydi sirket in _sirketler.SirketKayitlari)
             {
-                JsonObject panel = await PanelOkuAsync(sirket.SirketKimligi, cancellationToken);
+                JsonObject panel = paneller[sirket.SirketKimligi];
                 SirketEkosistemAyarlari sirketAyari = Ayarlar(sirket.SirketKimligi);
-                JsonArray urunler = panel["isletim"]?["urunler"] as JsonArray ?? [];
-                JsonArray teknikUygulamalar = panel["kodTabanliYayinlar"]?["uygulamalar"] as JsonArray ?? [];
-                JsonArray teknikProtokoller = panel["kodTabanliYayinlar"]?["protokoller"] as JsonArray ?? [];
-                Dictionary<string, JsonObject> uygulamalar = teknikUygulamalar.OfType<JsonObject>()
-                    .Select(x => x["uygulama"] as JsonObject)
-                    .Where(x => x is not null && !string.IsNullOrWhiteSpace(Str(x["uygulamaKimligi"])))
-                    .ToDictionary(x => Str(x!["uygulamaKimligi"]), x => x!, StringComparer.OrdinalIgnoreCase);
-
-                foreach (JsonObject urun in urunler.OfType<JsonObject>())
+                Dictionary<string, JsonObject> uygulamalar = UygulamaIndeksi(panel);
+                foreach (JsonObject urun in Urunler(panel).Where(x => Normal(Str(x["urunTuru"]), "uygulama") == "isletim-sistemi"))
                 {
-                    string urunKimligi = Str(urun["urunKimligi"]);
+                    string urunKimligi = Str(urun["urunKimligi"]), uygulamaKimligi = Str(urun["uygulamaKimligi"]);
                     if (string.IsNullOrWhiteSpace(urunKimligi)) continue;
-                    string uygulamaKimligi = Str(urun["uygulamaKimligi"]);
-                    string tur = Normal(Str(urun["urunTuru"]), "uygulama");
-                    UrunDagitimAyari ayar = UrunAyari(sirketAyari, urunKimligi, uygulamaKimligi, tur);
                     uygulamalar.TryGetValue(uygulamaKimligi, out JsonObject? uygulama);
-                    if (!ayar.KullaniciTarafindanYapilandirildi)
-                    {
-                        string manifestProtokolu = (uygulama?["desteklenenProtokoller"] as JsonArray)?.Select(Str).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? string.Empty;
-                        ayar.BaglantiProtokoluKimligi = manifestProtokolu;
-                        ayar.ElleAktifOlmasiIsteniyor = Bool(urun["aktif"]);
-                    }
-                    (ayar.Uyumlu, ayar.UyumDurumu) = UyumDogrula(sirket, ayar, tur, uygulama, teknikProtokoller);
-                    bool aktif = Bool(urun["aktif"]);
-                    if ((!ayar.Uyumlu || ayar.OtomatikDuraksatmaBitisTicki >= _tick) && aktif)
-                        await UrunAktifliginiDegistirAsync(sirket.SirketKimligi, urun, false, cancellationToken);
-                    else if (ayar.Uyumlu && ayar.ElleAktifOlmasiIsteniyor && ayar.OtomatikDuraksatmaBitisTicki < _tick && !aktif)
-                        await UrunAktifliginiDegistirAsync(sirket.SirketKimligi, urun, true, cancellationToken);
-
-                    if (tur == "isletim-sistemi" && ayar.Uyumlu && ayar.ElleAktifOlmasiIsteniyor && ayar.OtomatikDuraksatmaBitisTicki < _tick)
+                    UrunDagitimAyari ayar = UrunAyari(sirketAyari, urunKimligi, uygulamaKimligi, "isletim-sistemi");
+                    VarsayilanProtokoluUygula(ayar, uygulama, Bool(urun["aktif"]));
+                    (ayar.Uyumlu, ayar.UyumDurumu) = IsletimSistemiDogrula(ayar, uygulama, aktifProtokoller);
+                    await AktiflikUygulaAsync(sirket.SirketKimligi, urun, ayar, cancellationToken);
+                    if (ayar.Uyumlu && ayar.ElleAktifOlmasiIsteniyor && ayar.OtomatikDuraksatmaBitisTicki < _tick)
                     {
                         sistemler.Add(new IsletimSistemiPazarKaydi
                         {
@@ -315,11 +298,28 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
                         });
                     }
                 }
+            }
+            IsletimSistemiPazarDeposu.Guncelle(sistemler);
 
+            // İkinci geçiş: bütün diğer uygulamalar seçilen OS ve ortak protokole göre doğrulanır.
+            foreach (SirketKaydi sirket in _sirketler.SirketKayitlari)
+            {
+                JsonObject panel = paneller[sirket.SirketKimligi];
+                SirketEkosistemAyarlari sirketAyari = Ayarlar(sirket.SirketKimligi);
+                Dictionary<string, JsonObject> uygulamalar = UygulamaIndeksi(panel);
+                foreach (JsonObject urun in Urunler(panel).Where(x => Normal(Str(x["urunTuru"]), "uygulama") != "isletim-sistemi"))
+                {
+                    string urunKimligi = Str(urun["urunKimligi"]), uygulamaKimligi = Str(urun["uygulamaKimligi"]), tur = Normal(Str(urun["urunTuru"]), "uygulama");
+                    if (string.IsNullOrWhiteSpace(urunKimligi)) continue;
+                    uygulamalar.TryGetValue(uygulamaKimligi, out JsonObject? uygulama);
+                    UrunDagitimAyari ayar = UrunAyari(sirketAyari, urunKimligi, uygulamaKimligi, tur);
+                    VarsayilanProtokoluUygula(ayar, uygulama, Bool(urun["aktif"]));
+                    (ayar.Uyumlu, ayar.UyumDurumu) = UygulamaDogrula(ayar, uygulama, aktifProtokoller);
+                    await AktiflikUygulaAsync(sirket.SirketKimligi, urun, ayar, cancellationToken);
+                }
                 AltyapiSinirlari limit = LimitHesapla(sirket, panel);
                 await AsiriYukuIsleAsync(sirket, panel, sirketAyari, limit, cancellationToken);
             }
-            IsletimSistemiPazarDeposu.Guncelle(sistemler);
             await KaydetKilitsizAsync(cancellationToken);
         }
         finally { _kilit.Release(); }
@@ -331,29 +331,30 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
         try
         {
             JsonObject panel = await PanelOkuAsync(sirketKimligi, cancellationToken);
-            JsonObject? urun = (panel["isletim"]?["urunler"] as JsonArray)?.OfType<JsonObject>()
-                .FirstOrDefault(x => string.Equals(Str(x["urunKimligi"]), istek.UrunKimligi, StringComparison.OrdinalIgnoreCase));
+            JsonObject? urun = Urunler(panel).FirstOrDefault(x => string.Equals(Str(x["urunKimligi"]), istek.UrunKimligi, StringComparison.OrdinalIgnoreCase));
             if (urun is null) return IslemSonucu.Hata("Ürün bulunamadı.");
-            string tur = Normal(Str(urun["urunTuru"]), "uygulama");
-            string uygulamaKimligi = Str(urun["uygulamaKimligi"]);
-            SirketEkosistemAyarlari sirketAyari = Ayarlar(sirketKimligi);
-            UrunDagitimAyari ayar = UrunAyari(sirketAyari, istek.UrunKimligi, uygulamaKimligi, tur);
+            string tur = Normal(Str(urun["urunTuru"]), "uygulama"), uygulamaKimligi = Str(urun["uygulamaKimligi"]);
+            UygulamaIndeksi(panel).TryGetValue(uygulamaKimligi, out JsonObject? uygulama);
+            UrunDagitimAyari ayar = UrunAyari(Ayarlar(sirketKimligi), istek.UrunKimligi, uygulamaKimligi, tur);
             ayar.IsletimSistemiKimligi = istek.IsletimSistemiKimligi?.Trim() ?? string.Empty;
             ayar.BaglantiProtokoluKimligi = istek.BaglantiProtokoluKimligi?.Trim() ?? string.Empty;
             ayar.KullaniciTarafindanYapilandirildi = true;
             ayar.ElleAktifOlmasiIsteniyor = istek.Aktif;
-            JsonObject? teknik = (panel["kodTabanliYayinlar"]?["uygulamalar"] as JsonArray)?.OfType<JsonObject>()
-                .Select(x => x["uygulama"] as JsonObject)
-                .FirstOrDefault(x => x is not null && string.Equals(Str(x["uygulamaKimligi"]), uygulamaKimligi, StringComparison.OrdinalIgnoreCase));
-            JsonArray protokoller = panel["kodTabanliYayinlar"]?["protokoller"] as JsonArray ?? [];
-            SirketKaydi sirket = SirketZorunlu(sirketKimligi);
-            (ayar.Uyumlu, ayar.UyumDurumu) = UyumDogrula(sirket, ayar, tur, teknik, protokoller);
-            bool hedefAktif = istek.Aktif && ayar.Uyumlu && ayar.OtomatikDuraksatmaBitisTicki < _tick;
-            await UrunAktifliginiDegistirAsync(sirketKimligi, urun, hedefAktif, cancellationToken);
+            HashSet<string> aktifProtokoller = AktifProtokolleriBul(new Dictionary<string, JsonObject> { [sirketKimligi] = panel });
+            // Global protokoller diğer şirketlerden gelebilir.
+            foreach (SirketKaydi diger in _sirketler.SirketKayitlari.Where(x => !string.Equals(x.SirketKimligi, sirketKimligi, StringComparison.OrdinalIgnoreCase)))
+            {
+                JsonObject digerPanel = await PanelOkuAsync(diger.SirketKimligi, cancellationToken);
+                foreach (string protokol in AktifProtokolleriBul(new Dictionary<string, JsonObject> { [diger.SirketKimligi] = digerPanel })) aktifProtokoller.Add(protokol);
+            }
+            (ayar.Uyumlu, ayar.UyumDurumu) = tur == "isletim-sistemi"
+                ? IsletimSistemiDogrula(ayar, uygulama, aktifProtokoller)
+                : UygulamaDogrula(ayar, uygulama, aktifProtokoller);
+            await AktiflikUygulaAsync(sirketKimligi, urun, ayar, cancellationToken);
             await KaydetKilitsizAsync(cancellationToken);
-            return ayar.Uyumlu
-                ? IslemSonucu.Basari(hedefAktif ? "İşletim sistemi/protokol ayarı kaydedildi ve ürün yayına alındı." : "Dağıtım ayarı kaydedildi; ürün pasif bırakıldı.", ayar)
-                : IslemSonucu.Hata("Dağıtım ayarı kaydedildi fakat ürün aktif edilemedi: " + ayar.UyumDurumu);
+            return IslemSonucu.Basari(ayar.Uyumlu
+                ? (istek.Aktif ? "Dağıtım uyumlu; ürün yayına alındı." : "Dağıtım kaydedildi; ürün pasif bırakıldı.")
+                : "Dağıtım kaydedildi fakat ürün uyumsuz olduğu için pasif: " + ayar.UyumDurumu, ayar);
         }
         finally { _kilit.Release(); }
     }
@@ -366,26 +367,73 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
             JsonObject panel = JsonNode.Parse(temelJson) as JsonObject ?? new();
             SirketKaydi sirket = SirketZorunlu(sirketKimligi);
             SirketEkosistemAyarlari ayarlar = Ayarlar(sirketKimligi);
-            AltyapiSinirlari limit = LimitHesapla(sirket, panel);
-            IReadOnlyList<IsletimSistemiPazarKaydi> sistemler = IsletimSistemiPazarDeposu.Getir();
-            JsonArray urunler = panel["isletim"]?["urunler"] as JsonArray ?? [];
-            List<object> dagitim = urunler.OfType<JsonObject>().Select(u =>
+            List<object> dagitim = Urunler(panel).Select(u =>
             {
                 string kimlik = Str(u["urunKimligi"]);
-                UrunDagitimAyari ayar = UrunAyari(ayarlar, kimlik, Str(u["uygulamaKimligi"]), Normal(Str(u["urunTuru"]), "uygulama"));
-                return (object)new { urunKimligi = kimlik, ayar };
+                return (object)new { urunKimligi = kimlik, ayar = UrunAyari(ayarlar, kimlik, Str(u["uygulamaKimligi"]), Normal(Str(u["urunTuru"]), "uygulama")) };
             }).ToList();
+            IReadOnlyList<IsletimSistemiPazarKaydi> sistemler = IsletimSistemiPazarDeposu.Getir();
             panel["ekosistem"] = JsonSerializer.SerializeToNode(new
             {
-                altyapiSinirlari = limit,
+                altyapiSinirlari = LimitHesapla(sirket, panel),
                 dagitimAyarlari = dagitim,
                 isletimSistemleri = sistemler,
                 musteriIsletimSistemiDagilimi = sistemler.Select(x => new { x.UygulamaKimligi, x.UygulamaAdi, x.SirketAdi, x.AktifMusteriSayisi, x.KullaniciKapasitesi }),
-                zorunluKural = "Her müşteri bir işletim sistemi kullanır. Her uygulama seçili işletim sistemi ve uyumlu aktif protokol olmadan pasif kalır."
+                zorunluKural = "Her müşteri bir işletim sistemi kullanır. Her uygulama seçili işletim sistemi ve ortak aktif protokol olmadan pasif kalır."
             }, JsonAyarlari);
             return panel.ToJsonString(JsonAyarlari);
         }
         finally { _kilit.Release(); }
+    }
+
+    private static HashSet<string> AktifProtokolleriBul(IReadOnlyDictionary<string, JsonObject> paneller)
+    {
+        HashSet<string> sonuc = new(StringComparer.OrdinalIgnoreCase);
+        foreach (JsonObject panel in paneller.Values)
+        {
+            foreach (JsonObject kayit in (panel["kodTabanliYayinlar"]?["protokoller"] as JsonArray ?? []).OfType<JsonObject>().Where(x => Bool(x["piyasada"])))
+            {
+                string teknik = Str(kayit["protokol"]?["protokolKimligi"]), piyasa = Str(kayit["piyasaProtokolKimligi"]);
+                if (!string.IsNullOrWhiteSpace(teknik)) sonuc.Add(teknik);
+                if (!string.IsNullOrWhiteSpace(piyasa)) sonuc.Add(piyasa);
+            }
+        }
+        return sonuc;
+    }
+
+    private static (bool, string) IsletimSistemiDogrula(UrunDagitimAyari ayar, JsonObject? uygulama, IReadOnlySet<string> aktifProtokoller)
+    {
+        if (string.IsNullOrWhiteSpace(ayar.BaglantiProtokoluKimligi)) return (false, "Aktif bağlantı protokolü seçilmedi.");
+        if (!aktifProtokoller.Contains(ayar.BaglantiProtokoluKimligi)) return (false, "Seçilen protokol piyasada aktif değil.");
+        IReadOnlyList<string> destek = ProtokolListesi(uygulama, ayar);
+        if (destek.Count > 0 && !destek.Contains(ayar.BaglantiProtokoluKimligi, StringComparer.OrdinalIgnoreCase)) return (false, "İşletim sistemi manifesti seçilen protokolü desteklemiyor.");
+        return (true, "İşletim sistemi aktif protokol üzerinden müşteri kabul edebilir.");
+    }
+
+    private static (bool, string) UygulamaDogrula(UrunDagitimAyari ayar, JsonObject? uygulama, IReadOnlySet<string> aktifProtokoller)
+    {
+        if (string.IsNullOrWhiteSpace(ayar.IsletimSistemiKimligi)) return (false, "İşletim sistemi seçilmedi.");
+        if (string.IsNullOrWhiteSpace(ayar.BaglantiProtokoluKimligi)) return (false, "Bağlantı protokolü seçilmedi.");
+        if (!aktifProtokoller.Contains(ayar.BaglantiProtokoluKimligi)) return (false, "Seçilen protokol piyasada aktif değil.");
+        IsletimSistemiPazarKaydi? sistem = IsletimSistemiPazarDeposu.Getir().FirstOrDefault(x => string.Equals(x.UygulamaKimligi, ayar.IsletimSistemiKimligi, StringComparison.OrdinalIgnoreCase));
+        if (sistem is null || !sistem.Aktif) return (false, "Seçilen işletim sistemi aktif piyasada değil.");
+        if (!sistem.Protokoller.Contains(ayar.BaglantiProtokoluKimligi, StringComparer.OrdinalIgnoreCase)) return (false, "İşletim sistemi seçilen protokolü desteklemiyor.");
+        IReadOnlyList<string> destek = ProtokolListesi(uygulama, ayar);
+        if (destek.Count > 0 && !destek.Contains(ayar.BaglantiProtokoluKimligi, StringComparer.OrdinalIgnoreCase)) return (false, "Uygulama manifesti seçilen protokolü desteklemiyor.");
+        return (true, "İşletim sistemi ve protokol bağlantısı geçerli.");
+    }
+
+    private static void VarsayilanProtokoluUygula(UrunDagitimAyari ayar, JsonObject? uygulama, bool mevcutAktiflik)
+    {
+        if (ayar.KullaniciTarafindanYapilandirildi) return;
+        ayar.BaglantiProtokoluKimligi = (uygulama?["desteklenenProtokoller"] as JsonArray)?.Select(Str).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? string.Empty;
+        ayar.ElleAktifOlmasiIsteniyor = mevcutAktiflik;
+    }
+
+    private async Task AktiflikUygulaAsync(string sirketKimligi, JsonObject urun, UrunDagitimAyari ayar, CancellationToken cancellationToken)
+    {
+        bool hedef = ayar.Uyumlu && ayar.ElleAktifOlmasiIsteniyor && ayar.OtomatikDuraksatmaBitisTicki < _tick;
+        if (Bool(urun["aktif"]) != hedef) await UrunAktifliginiDegistirAsync(sirketKimligi, urun, hedef, cancellationToken);
     }
 
     private async Task AsiriYukuIsleAsync(SirketKaydi sirket, JsonObject panel, SirketEkosistemAyarlari ayarlar, AltyapiSinirlari limit, CancellationToken cancellationToken)
@@ -418,15 +466,14 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
         sirket.Kasa -= odenen;
         sirket.ToplamCeza += zarar - odenen;
 
-        JsonArray urunler = panel["isletim"]?["urunler"] as JsonArray ?? [];
-        foreach (JsonObject urun in urunler.OfType<JsonObject>())
+        foreach (JsonObject urun in Urunler(panel))
         {
             string kimlik = Str(urun["urunKimligi"]);
             UrunDagitimAyari ayar = UrunAyari(ayarlar, kimlik, Str(urun["uygulamaKimligi"]), Normal(Str(urun["urunTuru"]), "uygulama"));
             double kapasite = Math.Max(1, Int(urun["kullaniciKapasitesi"]));
             double urunYuku = Int(urun["aktifKullaniciSayisi"]) / kapasite + siddet * (0.15 + _rastgele.NextDouble() * 0.25);
             ayar.SonYukOrani = urunYuku;
-            if (urunYuku > 1) ayar.AsiriYukTickSayisi++; else ayar.AsiriYukTickSayisi = Math.Max(0, ayar.AsiriYukTickSayisi - 1);
+            ayar.AsiriYukTickSayisi = urunYuku > 1 ? ayar.AsiriYukTickSayisi + 1 : Math.Max(0, ayar.AsiriYukTickSayisi - 1);
             if (ayar.AsiriYukTickSayisi >= 2 && Bool(urun["aktif"]))
             {
                 int sure = _rastgele.Next(1, 4) + (urunYuku > 1.5 ? 2 : 0);
@@ -438,7 +485,7 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
 
         if (ayarlar.ArdisikAsiriYukTicki >= 3 && ayarlar.OtomatikDuraklatilanHizmetler.Count == 0)
         {
-            foreach (JsonObject h in (panel["kodTabanliYayinlar"]?["hizmetler"] as JsonArray ?? []).OfType<JsonObject>().Where(h => Bool(h["aktif"])))
+            foreach (JsonObject h in (panel["kodTabanliYayinlar"]?["hizmetler"] as JsonArray ?? []).OfType<JsonObject>().Where(x => Bool(x["aktif"])))
             {
                 string kimlik = Str(h["hizmetKimligi"]), surum = Str(h["hizmetSurumu"]);
                 if (string.IsNullOrWhiteSpace(kimlik)) continue;
@@ -450,49 +497,15 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
         }
     }
 
-    private (bool Gecerli, string Aciklama) UyumDogrula(SirketKaydi sirket, UrunDagitimAyari ayar, string tur, JsonObject? uygulama, JsonArray teknikProtokoller)
-    {
-        if (string.IsNullOrWhiteSpace(ayar.BaglantiProtokoluKimligi)) return (false, "Aktif bağlantı protokolü seçilmedi.");
-        JsonObject? teknikProtokol = teknikProtokoller.OfType<JsonObject>().FirstOrDefault(p =>
-            string.Equals(Str(p["protokol"]?["protokolKimligi"]), ayar.BaglantiProtokoluKimligi, StringComparison.OrdinalIgnoreCase));
-        bool kendiProtokolu = teknikProtokol is not null && Bool(teknikProtokol["piyasada"]);
-        bool piyasaProtokolu = false;
-        foreach (SirketKaydi diger in _sirketler.SirketKayitlari)
-        {
-            JsonObject? panel = null;
-            try { panel = JsonNode.Parse(_isletim.PanelJsonuOlusturAsync(diger.SirketKimligi, CancellationToken.None).GetAwaiter().GetResult()) as JsonObject; } catch { }
-            if ((panel?["kodTabanliYayinlar"]?["protokoller"] as JsonArray)?.OfType<JsonObject>().Any(p =>
-                string.Equals(Str(p["protokol"]?["protokolKimligi"]), ayar.BaglantiProtokoluKimligi, StringComparison.OrdinalIgnoreCase) && Bool(p["piyasada"])) == true)
-            {
-                piyasaProtokolu = true;
-                break;
-            }
-        }
-        if (!kendiProtokolu && !piyasaProtokolu) return (false, "Seçilen protokol piyasada aktif değil.");
-
-        List<string> desteklenen = ProtokolListesi(uygulama, ayar).ToList();
-        if (desteklenen.Count > 0 && !desteklenen.Contains(ayar.BaglantiProtokoluKimligi, StringComparer.OrdinalIgnoreCase))
-            return (false, "Ürün manifesti seçilen protokolü desteklemiyor.");
-
-        if (tur == "isletim-sistemi") return (true, "İşletim sistemi aktif protokol üzerinden müşteri kabul edebilir.");
-        if (string.IsNullOrWhiteSpace(ayar.IsletimSistemiKimligi)) return (false, "İşletim sistemi seçilmedi.");
-        IsletimSistemiPazarKaydi? sistem = IsletimSistemiPazarDeposu.Getir().FirstOrDefault(x =>
-            string.Equals(x.UygulamaKimligi, ayar.IsletimSistemiKimligi, StringComparison.OrdinalIgnoreCase));
-        if (sistem is null || !sistem.Aktif) return (false, "Seçilen işletim sistemi aktif piyasada değil.");
-        if (!sistem.Protokoller.Contains(ayar.BaglantiProtokoluKimligi, StringComparer.OrdinalIgnoreCase))
-            return (false, "İşletim sistemi seçilen bağlantı protokolünü desteklemiyor.");
-        return (true, "İşletim sistemi ve protokol bağlantısı geçerli.");
-    }
-
     private AltyapiSinirlari LimitHesapla(SirketKaydi sirket, JsonObject panel)
     {
         JsonObject yatirim = panel["isletim"]?["yatirimSeviyeleri"] as JsonObject ?? new();
         int cpu = Int(yatirim["cpu"]), ram = Int(yatirim["ram"]), ag = Int(yatirim["ag"]), depolama = Int(yatirim["depolama"]), yedek = Int(yatirim["yedek"]), destek = Int(yatirim["destek"]);
         JsonArray hizmetler = panel["kodTabanliYayinlar"]?["hizmetler"] as JsonArray ?? [];
-        JsonArray urunler = panel["isletim"]?["urunler"] as JsonArray ?? [];
-        int toplamHizmet = hizmetler.OfType<JsonObject>().Where(h => Bool(h["aktif"])).Sum(h => Int(h["etkinKapasite"], Int(h["azamiEszamanliIs"])));
-        int toplamUrun = urunler.OfType<JsonObject>().Where(u => Bool(u["aktif"])).Sum(u => Int(u["kullaniciKapasitesi"]));
-        int aktifKullanici = urunler.OfType<JsonObject>().Where(u => Bool(u["aktif"])).Sum(u => Int(u["aktifKullaniciSayisi"]));
+        List<JsonObject> urunler = Urunler(panel).ToList();
+        int toplamHizmet = hizmetler.OfType<JsonObject>().Where(x => Bool(x["aktif"])).Sum(x => Int(x["etkinKapasite"], Int(x["azamiEszamanliIs"])));
+        int toplamUrun = urunler.Where(x => Bool(x["aktif"])).Sum(x => Int(x["kullaniciKapasitesi"]));
+        int aktifKullanici = urunler.Where(x => Bool(x["aktif"])).Sum(x => Int(x["aktifKullaniciSayisi"]));
         double teknik = (sirket.KodKalitesiPuani * 0.28 + sirket.PerformansPuani * 0.32 + sirket.GuvenlikPuani * 0.20 + sirket.GuvenilirlikPuani * 0.20) / 100d;
         double islemKatsayi = Math.Clamp(0.48 + teknik * 0.32 + cpu * 0.018 + ag * 0.014 + yedek * 0.012, 0.5, 0.98);
         double kullaniciKatsayi = Math.Clamp(0.50 + teknik * 0.22 + ram * 0.017 + depolama * 0.014 + ag * 0.012 + destek * 0.008, 0.5, 0.98);
@@ -501,16 +514,15 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
         double islemYuku = Math.Max((double)sirket.AktifIsSayisi / guvenliIslem, (double)(sirket.AktifIsSayisi + sirket.KuyrukUzunlugu * 0.35) / guvenliIslem);
         double kullaniciYuku = (double)aktifKullanici / guvenliKullanici;
         double gecikme = Math.Clamp(sirket.SonGecikmeMs / 1_500d, 0, 3);
-        double burst = 0.04 + _rastgele.NextDouble() * 0.12;
-        double birlesik = Math.Max(islemYuku, kullaniciYuku) + gecikme * 0.18 + burst;
-        string durum = birlesik switch { < 0.75 => "rahat", < 0.95 => "yüksek", < 1.2 => "aşırı-yük", _ => "kritik" };
+        double birlesik = Math.Max(islemYuku, kullaniciYuku) + gecikme * 0.18 + 0.04 + _rastgele.NextDouble() * 0.12;
         return new AltyapiSinirlari
         {
             ToplamHizmetKapasitesi = toplamHizmet, GuvenliEszamanliIslemSiniri = guvenliIslem,
             MevcutAktifIs = sirket.AktifIsSayisi, KuyrukUzunlugu = sirket.KuyrukUzunlugu,
             ToplamUygulamaKapasitesi = toplamUrun, GuvenliAktifKullaniciSiniri = guvenliKullanici,
             MevcutAktifKullanici = aktifKullanici, IslemYukOrani = islemYuku,
-            KullaniciYukOrani = kullaniciYuku, GecikmeBaskisi = gecikme, BirlesikYukOrani = birlesik, Durum = durum
+            KullaniciYukOrani = kullaniciYuku, GecikmeBaskisi = gecikme, BirlesikYukOrani = birlesik,
+            Durum = birlesik switch { < 0.75 => "rahat", < 0.95 => "yüksek", < 1.2 => "aşırı-yük", _ => "kritik" }
         };
     }
 
@@ -525,6 +537,14 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
 
     private async Task<JsonObject> PanelOkuAsync(string sirketKimligi, CancellationToken cancellationToken) =>
         JsonNode.Parse(await _isletim.PanelJsonuOlusturAsync(sirketKimligi, cancellationToken)) as JsonObject ?? new();
+
+    private static Dictionary<string, JsonObject> UygulamaIndeksi(JsonObject panel) =>
+        (panel["kodTabanliYayinlar"]?["uygulamalar"] as JsonArray ?? []).OfType<JsonObject>()
+            .Select(x => x["uygulama"] as JsonObject).Where(x => x is not null && !string.IsNullOrWhiteSpace(Str(x["uygulamaKimligi"])))
+            .ToDictionary(x => Str(x!["uygulamaKimligi"]), x => x!, StringComparer.OrdinalIgnoreCase);
+
+    private static IEnumerable<JsonObject> Urunler(JsonObject panel) =>
+        (panel["isletim"]?["urunler"] as JsonArray ?? []).OfType<JsonObject>();
 
     private SirketEkosistemAyarlari Ayarlar(string sirketKimligi)
     {
@@ -546,7 +566,7 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
         return liste.AsReadOnly();
     }
 
-    private SirketKaydi SirketZorunlu(string kimlik) => _sirketler.SirketKayitlari.FirstOrDefault(s => string.Equals(s.SirketKimligi, kimlik, StringComparison.OrdinalIgnoreCase)) ?? throw new InvalidOperationException("Şirket bulunamadı.");
+    private SirketKaydi SirketZorunlu(string kimlik) => _sirketler.SirketKayitlari.FirstOrDefault(x => string.Equals(x.SirketKimligi, kimlik, StringComparison.OrdinalIgnoreCase)) ?? throw new InvalidOperationException("Şirket bulunamadı.");
     private static string Str(JsonNode? n, string d = "") { try { return n?.GetValue<string>() ?? d; } catch { return d; } }
     private static int Int(JsonNode? n, int d = 0) { try { return n?.GetValue<int>() ?? d; } catch { return d; } }
     private static decimal Dec(JsonNode? n, decimal d = 0) { try { return n?.GetValue<decimal>() ?? d; } catch { return d; } }
