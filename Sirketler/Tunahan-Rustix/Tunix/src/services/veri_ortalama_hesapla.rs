@@ -51,9 +51,9 @@ mod tests {
     fn tam_sayilarin_ortalamasini_hesaplar() {
         let sonuc = calistir(r#"{"sayilar":[10,20,30]}"#).expect("işlem başarılı olmalı");
         let json: Value = serde_json::from_str(&sonuc).expect("sonuç JSON olmalı");
+        let deger = json["sonuc"].as_f64().expect("sonuç sayı olmalı");
 
-        assert!(json["sonuc"].is_number());
-        assert_eq!(json["sonuc"], 20);
+        assert_eq!(deger, 20.0);
     }
 
     #[test]
