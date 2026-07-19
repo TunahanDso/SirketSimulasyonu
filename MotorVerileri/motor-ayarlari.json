@@ -29,6 +29,19 @@
       "sirketAdi": "Ugax",
       "adres": "192.168.1.36",
       "port": 7003
+    },
+    {
+      "sirketKimligi": "ilayda-ilos-tech",
+      "sirketAdi": "İlos Tech",
+      "adres": "127.0.0.1",
+      "port": 7004,
+      "baslangicKasasi": 40000,
+      "baslangicItibarPuani": 72,
+      "baslangicGuvenilirlikPuani": 80,
+      "baslangicKodKalitesiPuani": 84,
+      "baslangicPerformansPuani": 82,
+      "baslangicGuvenlikPuani": 88,
+      "baslangicMusteriMemnuniyeti": 76
     }
   ]
 }
