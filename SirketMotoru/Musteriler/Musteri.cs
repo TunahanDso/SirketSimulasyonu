@@ -18,6 +18,17 @@ public sealed class Musteri
     public int IsletimSistemiDegisimSayisi { get; set; }
     public long SonIsletimSistemiDegisimTicki { get; set; }
 
+    // V6 müşteri CV'si: işletim sistemi, kullanılan uygulamalar, sadakat ve dijital davranış.
+    public string MeslekProfili { get; set; } = string.Empty;
+    public string GelirSegmenti { get; set; } = "orta";
+    public List<string> KullandigiUygulamalar { get; set; } = [];
+    public Dictionary<string, int> UygulamaKullanimSayilari { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, double> UygulamaMemnuniyetleri { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
+    public int ToplamUygulamaDegisimSayisi { get; set; }
+    public long SonUygulamaDegisimTicki { get; set; }
+
     public Dictionary<string, int> HizmetKullanimSayilari { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
     public List<MusteriIslemKaydi> IslemGecmisi { get; set; } = [];
