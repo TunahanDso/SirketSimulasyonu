@@ -15,34 +15,21 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
     private static readonly JsonSerializerOptions JsonAyarlari =
         new()
         {
-            PropertyNamingPolicy =
-                JsonNamingPolicy.CamelCase,
-
-            WriteIndented =
-                false
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
         };
 
     private readonly MotorAyarlari _ayarlar;
-
     private readonly SirketYoneticisi _sirketYoneticisi;
-
     private readonly MusteriYoneticisi _musteriYoneticisi;
-
     private readonly HizmetKatalogu _hizmetKatalogu;
-
     private readonly Func<long> _tickNumarasiniGetir;
-
-    private readonly DateTimeOffset _baslangicZamani =
-        DateTimeOffset.UtcNow;
+    private readonly DateTimeOffset _baslangicZamani = DateTimeOffset.UtcNow;
 
     private TcpListener? _dinleyici;
-
     private CancellationTokenSource? _sunucuIptalKaynagi;
-
     private Task? _sunucuGorevi;
-
     private bool _baslatildi;
-
     private bool _disposed;
 
     public CanliPanoSunucusu(
@@ -52,39 +39,19 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
         HizmetKatalogu hizmetKatalogu,
         Func<long> tickNumarasiniGetir)
     {
-        ArgumentNullException.ThrowIfNull(
-            ayarlar);
-
-        ArgumentNullException.ThrowIfNull(
-            sirketYoneticisi);
-
-        ArgumentNullException.ThrowIfNull(
-            musteriYoneticisi);
-
-        ArgumentNullException.ThrowIfNull(
-            hizmetKatalogu);
-
-        ArgumentNullException.ThrowIfNull(
-            tickNumarasiniGetir);
-
-        _ayarlar =
-            ayarlar;
-
-        _sirketYoneticisi =
-            sirketYoneticisi;
-
-        _musteriYoneticisi =
-            musteriYoneticisi;
-
-        _hizmetKatalogu =
-            hizmetKatalogu;
-
-        _tickNumarasiniGetir =
-            tickNumarasiniGetir;
+        ArgumentNullException.ThrowIfNull(ayarlar);
+        ArgumentNullException.ThrowIfNull(sirketYoneticisi);
+        ArgumentNullException.ThrowIfNull(musteriYoneticisi);
+        ArgumentNullException.ThrowIfNull(hizmetKatalogu);
+        ArgumentNullException.ThrowIfNull(tickNumarasiniGetir);
+        _ayarlar = ayarlar;
+        _sirketYoneticisi = sirketYoneticisi;
+        _musteriYoneticisi = musteriYoneticisi;
+        _hizmetKatalogu = hizmetKatalogu;
+        _tickNumarasiniGetir = tickNumarasiniGetir;
     }
 
-    public Task BaslatAsync(
-        CancellationToken cancellationToken)
+    public Task BaslatAsync(CancellationToken cancellationToken)
     {
         DisposeEdilmediginiDogrula();
 
@@ -93,31 +60,23 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
             return Task.CompletedTask;
         }
 
-        _baslatildi =
-            true;
+        _baslatildi = true;
 
         if (!_ayarlar.CanliPanoAktif)
         {
             KonsolKayitcisi.Bilgi(
                 "Yerel ağ canlı panosu ayarlardan kapalı.");
-
             return Task.CompletedTask;
         }
 
         _sunucuIptalKaynagi =
-            CancellationTokenSource
-                .CreateLinkedTokenSource(
-                    cancellationToken);
-
+            CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken);
         _dinleyici =
             new TcpListener(
                 IPAddress.Any,
                 _ayarlar.CanliPanoPortu);
-
-        _dinleyici.Start(
-            backlog:
-                128);
-
+        _dinleyici.Start(128);
         _sunucuGorevi =
             IstemciKabulDongusuAsync(
                 _sunucuIptalKaynagi.Token);
@@ -125,11 +84,9 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
         KonsolKayitcisi.Basari(
             $"Canlı borsa panosu yayında | " +
             $"Port: {_ayarlar.CanliPanoPortu} | " +
-            $"Yenileme: " +
-            $"{_ayarlar.CanliPanoYenilemeMs} ms");
+            $"Yenileme: {_ayarlar.CanliPanoYenilemeMs} ms");
 
-        foreach (string adres in
-                 YayinAdresleriniGetir())
+        foreach (string adres in YayinAdresleriniGetir())
         {
             KonsolKayitcisi.Bilgi(
                 $"Canlı pano adresi: {adres}");
@@ -151,10 +108,8 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
             try
             {
                 TcpClient istemci =
-                    await _dinleyici
-                        .AcceptTcpClientAsync(
-                            cancellationToken);
-
+                    await _dinleyici.AcceptTcpClientAsync(
+                        cancellationToken);
                 _ = IstemciyiYonetAsync(
                     istemci,
                     cancellationToken);
@@ -173,13 +128,11 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
             {
                 KonsolKayitcisi.Uyari(
                     $"Canlı pano istemci kabul hatası: " +
-                    $"{exception.Message}");
+                    exception.Message);
 
                 try
                 {
-                    await Task.Delay(
-                        250,
-                        cancellationToken);
+                    await Task.Delay(250, cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -195,31 +148,22 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
     {
         using (istemci)
         {
-            istemci.NoDelay =
-                true;
+            istemci.NoDelay = true;
 
             try
             {
-                await using NetworkStream akis =
-                    istemci.GetStream();
-
+                await using NetworkStream akis = istemci.GetStream();
                 using StreamReader okuyucu =
                     new(
                         akis,
                         Encoding.ASCII,
-                        detectEncodingFromByteOrderMarks:
-                            false,
-                        bufferSize:
-                            4096,
-                        leaveOpen:
-                            true);
-
+                        false,
+                        4096,
+                        true);
                 string? istekSatiri =
-                    await okuyucu.ReadLineAsync(
-                        cancellationToken);
+                    await okuyucu.ReadLineAsync(cancellationToken);
 
-                if (string.IsNullOrWhiteSpace(
-                        istekSatiri) ||
+                if (string.IsNullOrWhiteSpace(istekSatiri) ||
                     istekSatiri.Length > 8_192)
                 {
                     await CevapGonderAsync(
@@ -229,18 +173,15 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                         "text/plain; charset=utf-8",
                         "Geçersiz HTTP isteği.",
                         cancellationToken);
-
                     return;
                 }
 
                 for (int i = 0; i < 100; i++)
                 {
                     string? baslik =
-                        await okuyucu.ReadLineAsync(
-                            cancellationToken);
+                        await okuyucu.ReadLineAsync(cancellationToken);
 
-                    if (string.IsNullOrEmpty(
-                            baslik))
+                    if (string.IsNullOrEmpty(baslik))
                     {
                         break;
                     }
@@ -254,7 +195,6 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                             "text/plain; charset=utf-8",
                             "HTTP başlığı çok büyük.",
                             cancellationToken);
-
                         return;
                     }
                 }
@@ -263,8 +203,7 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                     istekSatiri.Split(
                         ' ',
                         3,
-                        StringSplitOptions
-                            .RemoveEmptyEntries);
+                        StringSplitOptions.RemoveEmptyEntries);
 
                 if (parcalar.Length != 3 ||
                     !string.Equals(
@@ -279,15 +218,11 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                         "text/plain; charset=utf-8",
                         "Yalnızca GET destekleniyor.",
                         cancellationToken,
-                        ekBasliklar:
-                            "Allow: GET\r\n");
-
+                        "Allow: GET\r\n");
                     return;
                 }
 
-                string yol =
-                    parcalar[1]
-                        .Split('?', 2)[0];
+                string yol = parcalar[1].Split('?', 2)[0];
 
                 switch (yol)
                 {
@@ -301,7 +236,6 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                             CanliPanoHtml.Icerik,
                             cancellationToken);
                         break;
-
                     case "/api/durum":
                         await CevapGonderAsync(
                             akis,
@@ -311,7 +245,6 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                             DurumJsonuOlustur(),
                             cancellationToken);
                         break;
-
                     case "/api/saglik":
                         await CevapGonderAsync(
                             akis,
@@ -322,15 +255,12 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                                 new
                                 {
                                     durum = "calisiyor",
-                                    tickNumarasi =
-                                        _tickNumarasiniGetir(),
-                                    sunucuZamani =
-                                        DateTimeOffset.UtcNow
+                                    tickNumarasi = _tickNumarasiniGetir(),
+                                    sunucuZamani = DateTimeOffset.UtcNow
                                 },
                                 JsonAyarlari),
                             cancellationToken);
                         break;
-
                     case "/favicon.ico":
                         await CevapGonderAsync(
                             akis,
@@ -340,7 +270,6 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                             string.Empty,
                             cancellationToken);
                         break;
-
                     default:
                         await CevapGonderAsync(
                             akis,
@@ -355,53 +284,39 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
             catch (OperationCanceledException)
                 when (cancellationToken.IsCancellationRequested)
             {
-                // Motor kapanırken istemci işlemi sessizce biter.
             }
             catch (IOException)
             {
-                // Tarayıcı bağlantıyı erken kapatmış olabilir.
             }
             catch (SocketException)
             {
-                // Tarayıcı bağlantıyı erken kapatmış olabilir.
             }
             catch (Exception exception)
             {
                 KonsolKayitcisi.Uyari(
                     $"Canlı pano istemci hatası: " +
-                    $"{exception.Message}");
+                    exception.Message);
             }
         }
     }
 
     private string DurumJsonuOlustur()
     {
-        long tickNumarasi =
-            _tickNumarasiniGetir();
-
-        PanoPiyasaDurumu piyasa =
-            CanliPanoDurumDeposu.Getir();
-
-        IReadOnlyList<SirketMotoru.Ag.SirketBaglantisi>
-            baglantilar =
-                _sirketYoneticisi
-                    .BaglantilariGetir();
-
-        Dictionary<string, SirketBaglantiAyari>
-            sirketAyarlari =
-                _ayarlar.Sirketler
-                    .ToDictionary(
-                        sirket => sirket.SirketKimligi,
-                        StringComparer.OrdinalIgnoreCase);
+        long tickNumarasi = _tickNumarasiniGetir();
+        PanoPiyasaDurumu piyasa = CanliPanoDurumDeposu.Getir();
+        IReadOnlyList<SirketMotoru.Ag.SirketBaglantisi> baglantilar =
+            _sirketYoneticisi.BaglantilariGetir();
+        Dictionary<string, SirketBaglantiAyari> sirketAyarlari =
+            _ayarlar.Sirketler.ToDictionary(
+                sirket => sirket.SirketKimligi,
+                StringComparer.OrdinalIgnoreCase);
 
         var sirketler =
             baglantilar
                 .Select(
                     baglanti =>
                     {
-                        SirketKaydi kayit =
-                            baglanti.Kayit;
-
+                        SirketKaydi kayit = baglanti.Kayit;
                         sirketAyarlari.TryGetValue(
                             kayit.SirketKimligi,
                             out SirketBaglantiAyari? ayar);
@@ -410,15 +325,11 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                         {
                             kayit.SirketKimligi,
                             kayit.SirketAdi,
-                            sunucuAdresi =
-                                ayar?.Adres ?? string.Empty,
-                            sunucuPortu =
-                                ayar?.Port ?? 0,
+                            sunucuAdresi = ayar?.Adres ?? string.Empty,
+                            sunucuPortu = ayar?.Port ?? 0,
                             kayit.SunucuSurumu,
-                            durum =
-                                kayit.Durum.ToString(),
-                            bagli =
-                                baglanti.Bagli,
+                            durum = kayit.Durum.ToString(),
+                            bagli = baglanti.Bagli,
                             kayit.SonGecikmeMs,
                             kayit.SonCevapZamani,
                             kayit.SonBaglantiZamani,
@@ -430,8 +341,12 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                             kayit.ToplamCeza,
                             kayit.BekleyenOdeme,
                             kayit.NetGelir,
+                            kayit.ToplamGuvenlikKaybi,
                             kayit.ItibarPuani,
                             kayit.GuvenilirlikPuani,
+                            kayit.KodKalitesiPuani,
+                            kayit.PerformansPuani,
+                            kayit.GuvenlikPuani,
                             kayit.OrtalamaMusteriMemnuniyeti,
                             kayit.AktifIsSayisi,
                             kayit.TamamlananIsSayisi,
@@ -439,39 +354,36 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                             kayit.ZamanAsiminaUgrayanIsSayisi,
                             kayit.IptalEdilenIsSayisi,
                             kayit.ReddedilenIsSayisi,
+                            kayit.EngellenenSaldiriSayisi,
+                            kayit.BasariliSaldiriSayisi,
                             kayit.OrtalamaIsTutari,
                             kayit.OrtalamaIslemSuresiMs,
                             kayit.IsBasariOrani,
                             kayit.SonBasariliIsZamani,
                             kayit.SonBasarisizIsZamani,
-                            hizmetler =
-                                kayit.Hizmetler
-                                    .OrderBy(
-                                        hizmet =>
+                            hizmetler = kayit.Hizmetler
+                                .OrderBy(
+                                    hizmet => hizmet.HizmetKimligi,
+                                    StringComparer.OrdinalIgnoreCase)
+                                .Select(
+                                    hizmet =>
+                                        new
+                                        {
                                             hizmet.HizmetKimligi,
-                                        StringComparer.OrdinalIgnoreCase)
-                                    .Select(
-                                        hizmet =>
-                                            new
-                                            {
-                                                hizmet.HizmetKimligi,
-                                                hizmet.HizmetSurumu,
-                                                hizmet.BirimFiyat,
-                                                hizmet.AzamiEszamanliIs,
-                                                hizmet.Aktif
-                                            })
-                                    .ToList()
+                                            hizmet.HizmetSurumu,
+                                            hizmet.BirimFiyat,
+                                            hizmet.AzamiEszamanliIs,
+                                            hizmet.Aktif
+                                        })
+                                .ToList()
                         };
                     })
-                .OrderByDescending(
-                    sirket => sirket.NetGelir)
-                .ThenByDescending(
-                    sirket => sirket.ItibarPuani)
+                .OrderByDescending(sirket => sirket.NetGelir)
+                .ThenByDescending(sirket => sirket.KodKalitesiPuani)
                 .ToList();
 
         var hizmetPiyasasi =
-            _hizmetKatalogu
-                .Hizmetler
+            _hizmetKatalogu.Hizmetler
                 .OrderBy(
                     hizmet => hizmet.HizmetKimligi,
                     StringComparer.OrdinalIgnoreCase)
@@ -482,31 +394,26 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                     hizmet =>
                     {
                         PanoTalepGrubu? talep =
-                            piyasa.TalepGruplari
-                                .FirstOrDefault(
-                                    grup =>
-                                        string.Equals(
-                                            grup.HizmetKimligi,
-                                            hizmet.HizmetKimligi,
-                                            StringComparison.OrdinalIgnoreCase) &&
-                                        string.Equals(
-                                            grup.HizmetSurumu,
-                                            hizmet.HizmetSurumu,
-                                            StringComparison.OrdinalIgnoreCase));
-
+                            piyasa.TalepGruplari.FirstOrDefault(
+                                grup =>
+                                    string.Equals(
+                                        grup.HizmetKimligi,
+                                        hizmet.HizmetKimligi,
+                                        StringComparison.OrdinalIgnoreCase) &&
+                                    string.Equals(
+                                        grup.HizmetSurumu,
+                                        hizmet.HizmetSurumu,
+                                        StringComparison.OrdinalIgnoreCase));
                         var saglayicilar =
-                            _sirketYoneticisi
-                                .SirketKayitlari
+                            _sirketYoneticisi.SirketKayitlari
                                 .Select(
                                     sirket =>
                                         new
                                         {
-                                            Sirket =
-                                                sirket,
-                                            Hizmet =
-                                                sirket.HizmetiBul(
-                                                    hizmet.HizmetKimligi,
-                                                    hizmet.HizmetSurumu)
+                                            Sirket = sirket,
+                                            Hizmet = sirket.HizmetiBul(
+                                                hizmet.HizmetKimligi,
+                                                hizmet.HizmetSurumu)
                                         })
                                 .Where(
                                     aday =>
@@ -520,16 +427,17 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                                             aday.Sirket.SirketAdi,
                                             aday.Hizmet!.BirimFiyat,
                                             aday.Hizmet.AzamiEszamanliIs,
-                                            bagli =
-                                                aday.Sirket.BagliMi,
+                                            bagli = aday.Sirket.BagliMi,
                                             aday.Sirket.SonGecikmeMs,
                                             aday.Sirket.ItibarPuani,
-                                            aday.Sirket.GuvenilirlikPuani
+                                            aday.Sirket.GuvenilirlikPuani,
+                                            aday.Sirket.KodKalitesiPuani,
+                                            aday.Sirket.PerformansPuani,
+                                            aday.Sirket.GuvenlikPuani
                                         })
-                                .OrderBy(
-                                    aday => aday.BirimFiyat)
+                                .OrderBy(aday => aday.BirimFiyat)
                                 .ThenByDescending(
-                                    aday => aday.ItibarPuani)
+                                    aday => aday.KodKalitesiPuani)
                                 .ToList();
 
                         return new
@@ -540,69 +448,61 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                             hizmet.Aktif,
                             hizmet.ZamanAsimiMs,
                             hizmet.AzamiIstekBoyutuByte,
-                            talepSayisi =
-                                talep?.TalepSayisi ?? 0,
+                            talepSayisi = talep?.TalepSayisi ?? 0,
+                            kotuNiyetliTalepSayisi =
+                                talep?.KotuNiyetliTalepSayisi ?? 0,
+                            ortalamaZorlukSeviyesi =
+                                talep?.OrtalamaZorlukSeviyesi ?? 0,
                             toplamTalepButcesi =
                                 talep?.ToplamAzamiButce ?? 0,
                             ortalamaTalepButcesi =
                                 talep?.OrtalamaAzamiButce ?? 0,
                             enYuksekTalepButcesi =
                                 talep?.EnYuksekAzamiButce ?? 0,
-                            saglayiciSayisi =
-                                saglayicilar.Count,
+                            saglayiciSayisi = saglayicilar.Count,
                             enUcuzFiyat =
                                 saglayicilar.Count == 0
                                     ? (decimal?)null
                                     : saglayicilar.Min(
-                                        saglayici =>
-                                            saglayici.BirimFiyat),
+                                        saglayici => saglayici.BirimFiyat),
                             enPahaliFiyat =
                                 saglayicilar.Count == 0
                                     ? (decimal?)null
                                     : saglayicilar.Max(
-                                        saglayici =>
-                                            saglayici.BirimFiyat),
+                                        saglayici => saglayici.BirimFiyat),
                             saglayicilar
                         };
                     })
                 .ToList();
 
         int bagliSirketSayisi =
-            baglantilar.Count(
-                baglanti => baglanti.Bagli);
-
+            baglantilar.Count(baglanti => baglanti.Bagli);
         int toplamHizmetIlani =
-            _sirketYoneticisi
-                .SirketKayitlari
-                .Sum(
-                    sirket => sirket.Hizmetler.Count);
-
+            _sirketYoneticisi.SirketKayitlari.Sum(
+                sirket => sirket.Hizmetler.Count);
         decimal toplamSirketKasasi =
-            _sirketYoneticisi
-                .SirketKayitlari
-                .Sum(
-                    sirket => sirket.Kasa);
-
+            _sirketYoneticisi.SirketKayitlari.Sum(
+                sirket => sirket.Kasa);
         decimal toplamNetGelir =
-            _sirketYoneticisi
-                .SirketKayitlari
-                .Sum(
-                    sirket => sirket.NetGelir);
-
+            _sirketYoneticisi.SirketKayitlari.Sum(
+                sirket => sirket.NetGelir);
+        decimal toplamGuvenlikKaybi =
+            _sirketYoneticisi.SirketKayitlari.Sum(
+                sirket => sirket.ToplamGuvenlikKaybi);
         int toplamTamamlananIs =
-            _sirketYoneticisi
-                .SirketKayitlari
-                .Sum(
-                    sirket =>
-                        sirket.TamamlananIsSayisi);
-
+            _sirketYoneticisi.SirketKayitlari.Sum(
+                sirket => sirket.TamamlananIsSayisi);
         int toplamBasarisizIs =
-            _sirketYoneticisi
-                .SirketKayitlari
-                .Sum(
-                    sirket =>
-                        sirket.BasarisizIsSayisi +
-                        sirket.ZamanAsiminaUgrayanIsSayisi);
+            _sirketYoneticisi.SirketKayitlari.Sum(
+                sirket =>
+                    sirket.BasarisizIsSayisi +
+                    sirket.ZamanAsiminaUgrayanIsSayisi);
+        int toplamEngellenenSaldiri =
+            _sirketYoneticisi.SirketKayitlari.Sum(
+                sirket => sirket.EngellenenSaldiriSayisi);
+        int toplamBasariliSaldiri =
+            _sirketYoneticisi.SirketKayitlari.Sum(
+                sirket => sirket.BasariliSaldiriSayisi);
 
         object durum =
             new
@@ -613,64 +513,50 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
                         _ayarlar.MotorKimligi,
                         _ayarlar.ProtokolSurumu,
                         tickNumarasi,
-                        tickSuresiSaniye =
-                            _ayarlar.TickSuresiSaniye,
-                        katalogSurumu =
-                            _hizmetKatalogu.KatalogSurumu,
-                        baslangicZamani =
-                            _baslangicZamani,
+                        tickSuresiSaniye = _ayarlar.TickSuresiSaniye,
+                        katalogSurumu = _hizmetKatalogu.KatalogSurumu,
+                        baslangicZamani = _baslangicZamani,
                         calismaSuresiSaniye =
                             Math.Max(
                                 0,
-                                (DateTimeOffset.UtcNow -
-                                 _baslangicZamani)
+                                (DateTimeOffset.UtcNow - _baslangicZamani)
                                     .TotalSeconds),
-                        sunucuZamani =
-                            DateTimeOffset.UtcNow,
-                        panoPortu =
-                            _ayarlar.CanliPanoPortu,
-                        panoYenilemeMs =
-                            _ayarlar.CanliPanoYenilemeMs
+                        sunucuZamani = DateTimeOffset.UtcNow,
+                        panoPortu = _ayarlar.CanliPanoPortu,
+                        panoYenilemeMs = _ayarlar.CanliPanoYenilemeMs
                     },
                 genel =
                     new
                     {
-                        toplamSirketSayisi =
-                            baglantilar.Count,
+                        toplamSirketSayisi = baglantilar.Count,
                         bagliSirketSayisi,
                         toplamHizmetIlani,
                         toplamSirketKasasi,
                         toplamNetGelir,
+                        toplamGuvenlikKaybi,
+                        toplamEngellenenSaldiri,
+                        toplamBasariliSaldiri,
                         toplamTamamlananIs,
                         toplamBasarisizIs,
                         toplamMusteriSayisi =
-                            _musteriYoneticisi
-                                .Musteriler.Count,
+                            _musteriYoneticisi.Musteriler.Count,
                         aktifMusteriSayisi =
-                            _musteriYoneticisi
-                                .AktifMusteriSayisi,
+                            _musteriYoneticisi.AktifMusteriSayisi,
                         toplamMusteriBakiyesi =
-                            _musteriYoneticisi
-                                .ToplamMusteriBakiyesi,
+                            _musteriYoneticisi.ToplamMusteriBakiyesi,
                         toplamMusteriHarcamasi =
-                            _musteriYoneticisi
-                                .ToplamMusteriHarcamasi
+                            _musteriYoneticisi.ToplamMusteriHarcamasi
                     },
                 piyasa,
                 sirketler,
                 hizmetPiyasasi,
-                olaylar =
-                    KonsolKayitcisi
-                        .SonKayitlariGetir(
-                            250)
+                olaylar = KonsolKayitcisi.SonKayitlariGetir(250)
             };
 
-        return JsonSerializer.Serialize(
-            durum,
-            JsonAyarlari);
+        return JsonSerializer.Serialize(durum, JsonAyarlari);
     }
 
-    private async Task CevapGonderAsync(
+    private static async Task CevapGonderAsync(
         NetworkStream akis,
         int durumKodu,
         string durumMetni,
@@ -679,10 +565,7 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
         CancellationToken cancellationToken,
         string ekBasliklar = "")
     {
-        byte[] icerikBaytlari =
-            Encoding.UTF8.GetBytes(
-                icerik);
-
+        byte[] icerikBaytlari = Encoding.UTF8.GetBytes(icerik);
         string baslik =
             $"HTTP/1.1 {durumKodu} {durumMetni}\r\n" +
             $"Content-Type: {icerikTuru}\r\n" +
@@ -693,24 +576,15 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
             "Connection: close\r\n" +
             ekBasliklar +
             "\r\n";
-
-        byte[] baslikBaytlari =
-            Encoding.ASCII.GetBytes(
-                baslik);
-
-        await akis.WriteAsync(
-            baslikBaytlari,
-            cancellationToken);
+        byte[] baslikBaytlari = Encoding.ASCII.GetBytes(baslik);
+        await akis.WriteAsync(baslikBaytlari, cancellationToken);
 
         if (icerikBaytlari.Length > 0)
         {
-            await akis.WriteAsync(
-                icerikBaytlari,
-                cancellationToken);
+            await akis.WriteAsync(icerikBaytlari, cancellationToken);
         }
 
-        await akis.FlushAsync(
-            cancellationToken);
+        await akis.FlushAsync(cancellationToken);
     }
 
     private IReadOnlyList<string> YayinAdresleriniGetir()
@@ -718,31 +592,26 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
         HashSet<string> adresler =
             new(StringComparer.OrdinalIgnoreCase)
             {
-                $"http://localhost:" +
-                $"{_ayarlar.CanliPanoPortu}/"
+                $"http://localhost:{_ayarlar.CanliPanoPortu}/"
             };
 
         try
         {
             foreach (IPAddress adres in
-                     Dns.GetHostEntry(
-                             Dns.GetHostName())
+                     Dns.GetHostEntry(Dns.GetHostName())
                          .AddressList
                          .Where(
                              adres =>
                                  adres.AddressFamily ==
                                  AddressFamily.InterNetwork &&
-                                 !IPAddress.IsLoopback(
-                                     adres)))
+                                 !IPAddress.IsLoopback(adres)))
             {
                 adresler.Add(
-                    $"http://{adres}:" +
-                    $"{_ayarlar.CanliPanoPortu}/");
+                    $"http://{adres}:{_ayarlar.CanliPanoPortu}/");
             }
         }
         catch
         {
-            // Yerel IP bulunamazsa localhost adresi yeterlidir.
         }
 
         return adresler
@@ -755,9 +624,7 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
 
     private void DisposeEdilmediginiDogrula()
     {
-        ObjectDisposedException.ThrowIf(
-            _disposed,
-            this);
+        ObjectDisposedException.ThrowIf(_disposed, this);
     }
 
     public async ValueTask DisposeAsync()
@@ -767,17 +634,8 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
             return;
         }
 
-        _disposed =
-            true;
-
-        try
-        {
-            _sunucuIptalKaynagi?.Cancel();
-        }
-        catch
-        {
-            // Kapatma sırasında iptal hatası yok sayılır.
-        }
+        _disposed = true;
+        _sunucuIptalKaynagi?.Cancel();
 
         try
         {
@@ -785,7 +643,6 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
         }
         catch
         {
-            // Kapatma sırasında dinleyici hatası yok sayılır.
         }
 
         if (_sunucuGorevi is not null)
@@ -796,17 +653,9 @@ public sealed class CanliPanoSunucusu : IAsyncDisposable
             }
             catch (OperationCanceledException)
             {
-                // Beklenen kapanış.
-            }
-            catch (ObjectDisposedException)
-            {
-                // Beklenen kapanış.
             }
         }
 
         _sunucuIptalKaynagi?.Dispose();
-
-        KonsolKayitcisi.Bilgi(
-            "Canlı borsa panosu durduruldu.");
     }
 }
