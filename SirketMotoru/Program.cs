@@ -113,18 +113,19 @@ try
         musteriYoneticisi,
         isletimYoneticisi);
 
-    await using CanliPanoSunucusu canliPanoSunucusu = new(
+    await using YazilimBorsasiSunucusu yazilimBorsasiSunucusu = new(
         motorAyarlari,
         sirketYoneticisi,
         musteriYoneticisi,
         hizmetKatalogu,
+        isletimYoneticisi,
         () => tickYoneticisi.TickNumarasi);
 
     await using SirketYonetimSunucusu sirketYonetimSunucusu = new(
         motorAyarlari,
         isletimYoneticisi);
 
-    await canliPanoSunucusu.BaslatAsync(iptalKaynagi.Token);
+    await yazilimBorsasiSunucusu.BaslatAsync(iptalKaynagi.Token);
     await sirketYonetimSunucusu.BaslatAsync(iptalKaynagi.Token);
     await sirketYoneticisi.IlkBaglantilariKurAsync(iptalKaynagi.Token);
     await tickYoneticisi.BaslatAsync(iptalKaynagi.Token);
