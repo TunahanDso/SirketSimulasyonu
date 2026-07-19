@@ -31,7 +31,7 @@ public sealed class HizmetTalebi
     public string KotuNiyetTuru { get; init; } =
         string.Empty;
 
-    public decimal OlasıGuvenlikKaybi { get; init; }
+    public decimal OlasiGuvenlikKaybi { get; init; }
 
     public IsDurumu Durum { get; set; } =
         IsDurumu.Olusturuldu;
