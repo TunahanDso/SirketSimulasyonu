@@ -19,6 +19,12 @@ public sealed class IsAtamaSonucu
     public string SonucVerisiJson { get; init; } =
         "{}";
 
+    public bool GuvenlikOlayi { get; init; }
+
+    public bool SaldiriEngellendi { get; init; }
+
+    public decimal GuvenlikKaybi { get; init; }
+
     public static IsAtamaSonucu BasariliSonuc(
         string isKimligi,
         string sirketKimligi,
@@ -61,4 +67,28 @@ public sealed class IsAtamaSonucu
             SonucVerisiJson =
                 "{}"
         };
-    }}
+    }
+
+    public static IsAtamaSonucu GuvenlikSonucu(
+        string isKimligi,
+        string sirketKimligi,
+        bool saldiriEngellendi,
+        decimal guvenlikKaybi,
+        double islemSuresiMs,
+        string aciklama)
+    {
+        return new IsAtamaSonucu
+        {
+            Basarili = false,
+            IsKimligi = isKimligi,
+            SirketKimligi = sirketKimligi,
+            IslemTutari = 0,
+            IslemSuresiMs = Math.Max(0, islemSuresiMs),
+            SonucAciklamasi = aciklama,
+            SonucVerisiJson = "{}",
+            GuvenlikOlayi = true,
+            SaldiriEngellendi = saldiriEngellendi,
+            GuvenlikKaybi = Math.Max(0, guvenlikKaybi)
+        };
+    }
+}
