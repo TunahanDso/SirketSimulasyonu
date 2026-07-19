@@ -57,6 +57,7 @@ try
     PazarFiyatOzTesti.Dogrula();
     await using PazarFiyatYoneticisi pazarFiyatYoneticisi = new(isletimYoneticisi, sirketYoneticisi, motorVerileriKlasoru);
     await pazarFiyatYoneticisi.BaslatAsync(iptalKaynagi.Token);
+    PazarGelirDuzeltmeYoneticisi pazarGelirDuzeltmeYoneticisi = new(isletimYoneticisi, sirketYoneticisi);
 
     await BaslangicMigrasyonlari.TekSeferlikFinansmanDestekleriniUygulaAsync(sirketYoneticisi, motorVerileriKlasoru, iptalKaynagi.Token);
 
@@ -67,7 +68,8 @@ try
         musteriIsletimSistemiYoneticisi,
         isletimYoneticisi,
         ekosistemYoneticisi,
-        pazarFiyatYoneticisi);
+        pazarFiyatYoneticisi,
+        pazarGelirDuzeltmeYoneticisi);
 
     await using YazilimBorsasiSunucusu yazilimBorsasiSunucusu = new(
         motorAyarlari,
