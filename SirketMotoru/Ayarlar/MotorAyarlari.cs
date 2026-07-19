@@ -14,5 +14,11 @@ public sealed class MotorAyarlari
 
     public int AzamiMesajBoyutuByte { get; set; } = 65_536;
 
+    public bool CanliPanoAktif { get; set; } = true;
+
+    public int CanliPanoPortu { get; set; } = 8080;
+
+    public int CanliPanoYenilemeMs { get; set; } = 1_000;
+
     public List<SirketBaglantiAyari> Sirketler { get; set; } = [];
 }
