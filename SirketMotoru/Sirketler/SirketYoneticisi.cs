@@ -98,6 +98,35 @@ public sealed class SirketYoneticisi : IAsyncDisposable
         SirketDurumOzetiniYazdir();
     }
 
+    /// <summary>
+    /// Ekonomi ilerlemeden yalnız bağlantı ve sağlık durumunu hazırlar.
+    /// Piyasa yıpranması, gelir, gider veya başka oyun etkisi uygulamaz.
+    /// </summary>
+    public async Task<int> BaglantilariHazirlaAsync(
+        long sonTamamlananTick,
+        CancellationToken cancellationToken)
+    {
+        foreach (SirketBaglantisi baglanti in _baglantilar)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!baglanti.Bagli)
+            {
+                KonsolKayitcisi.Bilgi(
+                    $"{baglanti.Kayit.SirketAdi} bekleme modunda yeniden bağlanıyor.");
+                bool baglandi =
+                    await baglanti.BaglanVeKaydetAsync(cancellationToken);
+                if (!baglandi) continue;
+            }
+
+            await baglanti.SaglikKontrolEtAsync(
+                Math.Max(0, sonTamamlananTick),
+                cancellationToken);
+        }
+
+        return _baglantilar.Count(baglanti => baglanti.Kayit.BagliMi);
+    }
+
     public async Task TickCalistirAsync(
         long tickNumarasi,
         CancellationToken cancellationToken)
@@ -304,7 +333,7 @@ public sealed class SirketYoneticisi : IAsyncDisposable
             $"Kalite: {ortalamaKalite:N1} | " +
             $"Performans: {ortalamaPerformans:N1} | " +
             $"Güvenlik: {ortalamaGuvenlik:N1} | " +
-            $"Saldırı E/B: {toplamEngellenenSaldiri}/{toplamBasariliSaldiri}");
+            $"Yeni sezon saldırı E/B: {toplamEngellenenSaldiri}/{toplamBasariliSaldiri}");
     }
 
     public async ValueTask DisposeAsync()
