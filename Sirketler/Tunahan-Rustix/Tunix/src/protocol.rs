@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 pub const PROTOKOL_SURUMU: &str = "0.1";
 pub const SIRKET_KIMLIGI: &str = "tunahan-tunix";
 pub const SIRKET_ADI: &str = "Tunix";
-pub const SUNUCU_SURUMU: &str = "0.5.1";
+pub const SUNUCU_SURUMU: &str = "0.6.0";
+
 pub const MATEMATIK_TOPLA: &str = "matematik.topla";
 pub const MATEMATIK_TOPLA_SURUMU: &str = "1.0";
 pub const MATEMATIK_CARP: &str = "matematik.carp";
@@ -15,6 +16,16 @@ pub const METIN_KELIME_SAY: &str = "metin.kelime-say";
 pub const METIN_KELIME_SAY_SURUMU: &str = "1.0";
 pub const METIN_KARAKTER_SAY: &str = "metin.karakter-say";
 pub const METIN_KARAKTER_SAY_SURUMU: &str = "1.0";
+pub const VERI_MEDYAN_HESAPLA: &str = "veri.medyan-hesapla";
+pub const VERI_MEDYAN_HESAPLA_SURUMU: &str = "1.0";
+pub const VERI_STANDART_SAPMA: &str = "veri.standart-sapma";
+pub const VERI_STANDART_SAPMA_SURUMU: &str = "1.0";
+pub const DIZI_SIRALA: &str = "dizi.sirala";
+pub const DIZI_SIRALA_SURUMU: &str = "1.0";
+pub const MATEMATIK_ASAL_CARPANLAR: &str = "matematik.asal-carpanlar";
+pub const MATEMATIK_ASAL_CARPANLAR_SURUMU: &str = "1.0";
+pub const METIN_FREKANS_ANALIZI: &str = "metin.frekans-analizi";
+pub const METIN_FREKANS_ANALIZI_SURUMU: &str = "1.0";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -154,7 +165,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tanitim_mesaji_bes_hizmeti_icerir() {
+    fn tanitim_mesaji_on_hizmeti_icerir() {
+        let hizmetler = vec![
+            SunulanHizmet { hizmet_kimligi: MATEMATIK_TOPLA, hizmet_surumu: MATEMATIK_TOPLA_SURUMU, birim_fiyat: Decimal::new(5, 0), azami_eszamanli_is: 1, aktif: true },
+            SunulanHizmet { hizmet_kimligi: MATEMATIK_CARP, hizmet_surumu: MATEMATIK_CARP_SURUMU, birim_fiyat: Decimal::new(8, 0), azami_eszamanli_is: 1, aktif: true },
+            SunulanHizmet { hizmet_kimligi: VERI_ORTALAMA_HESAPLA, hizmet_surumu: VERI_ORTALAMA_HESAPLA_SURUMU, birim_fiyat: Decimal::new(15, 0), azami_eszamanli_is: 1, aktif: true },
+            SunulanHizmet { hizmet_kimligi: METIN_KELIME_SAY, hizmet_surumu: METIN_KELIME_SAY_SURUMU, birim_fiyat: Decimal::new(7, 0), azami_eszamanli_is: 1, aktif: true },
+            SunulanHizmet { hizmet_kimligi: METIN_KARAKTER_SAY, hizmet_surumu: METIN_KARAKTER_SAY_SURUMU, birim_fiyat: Decimal::new(4, 0), azami_eszamanli_is: 1, aktif: true },
+            SunulanHizmet { hizmet_kimligi: VERI_MEDYAN_HESAPLA, hizmet_surumu: VERI_MEDYAN_HESAPLA_SURUMU, birim_fiyat: Decimal::new(22, 0), azami_eszamanli_is: 1, aktif: true },
+            SunulanHizmet { hizmet_kimligi: VERI_STANDART_SAPMA, hizmet_surumu: VERI_STANDART_SAPMA_SURUMU, birim_fiyat: Decimal::new(35, 0), azami_eszamanli_is: 1, aktif: true },
+            SunulanHizmet { hizmet_kimligi: DIZI_SIRALA, hizmet_surumu: DIZI_SIRALA_SURUMU, birim_fiyat: Decimal::new(28, 0), azami_eszamanli_is: 1, aktif: true },
+            SunulanHizmet { hizmet_kimligi: MATEMATIK_ASAL_CARPANLAR, hizmet_surumu: MATEMATIK_ASAL_CARPANLAR_SURUMU, birim_fiyat: Decimal::new(45, 0), azami_eszamanli_is: 1, aktif: true },
+            SunulanHizmet { hizmet_kimligi: METIN_FREKANS_ANALIZI, hizmet_surumu: METIN_FREKANS_ANALIZI_SURUMU, birim_fiyat: Decimal::new(32, 0), azami_eszamanli_is: 1, aktif: true },
+        ];
+
         let mesaj = SirketTanitimMesaji {
             mesaj_turu: "sirketTanitim",
             mesaj_kimligi: "tunix-test-1".to_string(),
@@ -162,29 +186,14 @@ mod tests {
             sirket_kimligi: SIRKET_KIMLIGI,
             sirket_adi: SIRKET_ADI,
             sunucu_surumu: SUNUCU_SURUMU,
-            hizmetler: vec![
-                SunulanHizmet { hizmet_kimligi: MATEMATIK_TOPLA, hizmet_surumu: MATEMATIK_TOPLA_SURUMU, birim_fiyat: Decimal::new(5, 0), azami_eszamanli_is: 1, aktif: true },
-                SunulanHizmet { hizmet_kimligi: MATEMATIK_CARP, hizmet_surumu: MATEMATIK_CARP_SURUMU, birim_fiyat: Decimal::new(8, 0), azami_eszamanli_is: 1, aktif: true },
-                SunulanHizmet { hizmet_kimligi: VERI_ORTALAMA_HESAPLA, hizmet_surumu: VERI_ORTALAMA_HESAPLA_SURUMU, birim_fiyat: Decimal::new(15, 0), azami_eszamanli_is: 1, aktif: true },
-                SunulanHizmet { hizmet_kimligi: METIN_KELIME_SAY, hizmet_surumu: METIN_KELIME_SAY_SURUMU, birim_fiyat: Decimal::new(7, 0), azami_eszamanli_is: 1, aktif: true },
-                SunulanHizmet { hizmet_kimligi: METIN_KARAKTER_SAY, hizmet_surumu: METIN_KARAKTER_SAY_SURUMU, birim_fiyat: Decimal::new(4, 0), azami_eszamanli_is: 1, aktif: true },
-            ],
+            hizmetler,
         };
 
         let json = serde_json::to_value(mesaj).expect("mesaj serialize edilmeli");
         let hizmetler = json["hizmetler"].as_array().expect("hizmetler dizi olmalı");
 
-        assert_eq!(hizmetler.len(), 5);
-        assert!(hizmetler.iter().all(|h| h["birimFiyat"].is_number()));
-        assert_eq!(hizmetler[0]["hizmetKimligi"], MATEMATIK_TOPLA);
-        assert_eq!(hizmetler[1]["hizmetKimligi"], MATEMATIK_CARP);
-        assert_eq!(hizmetler[2]["hizmetKimligi"], VERI_ORTALAMA_HESAPLA);
-        assert_eq!(hizmetler[3]["hizmetKimligi"], METIN_KELIME_SAY);
-        assert_eq!(hizmetler[4]["hizmetKimligi"], METIN_KARAKTER_SAY);
-        assert_eq!(hizmetler[0]["birimFiyat"], 5);
-        assert_eq!(hizmetler[1]["birimFiyat"], 8);
-        assert_eq!(hizmetler[2]["birimFiyat"], 15);
-        assert_eq!(hizmetler[3]["birimFiyat"], 7);
-        assert_eq!(hizmetler[4]["birimFiyat"], 4);
+        assert_eq!(hizmetler.len(), 10);
+        assert_eq!(hizmetler[5]["hizmetKimligi"], VERI_MEDYAN_HESAPLA);
+        assert_eq!(hizmetler[9]["hizmetKimligi"], METIN_FREKANS_ANALIZI);
     }
 }
