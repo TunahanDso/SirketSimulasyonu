@@ -31,6 +31,32 @@ pub fn standart_hizmetler() -> Vec<SunulanHizmet> {
         h(STD_OS_LOG, 5, 18),
         h(STD_OS_UYGULAMA, 14, 12),
         h(STD_GUVENLIK_ISTEK, 5, 24),
+
+        // Tunix 0.9 geniş hizmet paketi: metin, dizi, veri, arama ve bildirim.
+        h("metin.buyuk-harf", 5, 24),
+        h("metin.kucuk-harf", 5, 24),
+        h("metin.birlestir", 7, 20),
+        h("metin.parcala", 7, 20),
+        h("metin.ozetle", 12, 14),
+        h("metin.anahtar-kelime", 14, 12),
+        h("dizi.filtrele", 9, 18),
+        h("dizi.birlestir", 8, 20),
+        h("dizi.kesisim", 11, 16),
+        h("dizi.birlesim", 11, 16),
+        h("dizi.parcala", 8, 20),
+        h("dizi.dogrula", 6, 24),
+        h("veri.filtrele", 12, 16),
+        h("veri.temizle", 13, 16),
+        h("veri.normalize-et", 15, 14),
+        h("veri.gruplandir", 16, 12),
+        h("veri.birlestir", 14, 14),
+        h("veri.korelasyon", 20, 10),
+        h("arama.ara", 10, 20),
+        h("arama.sirala", 9, 20),
+        h("arama.otomatik-tamamla", 11, 18),
+        h("arama.yazim-duzelt", 10, 18),
+        h("bildirim.push-gonder", 8, 24),
+        h("bildirim.zamanla", 9, 20),
     ]
 }
 
@@ -171,5 +197,17 @@ mod tests {
         let app = uygulamalar().into_iter().find(|x| x.uygulama_kimligi == "tunix-tingram").unwrap();
         assert!(app.ozellikler.iter().any(|x| x.hizmet_kimligi == STD_SOSYAL_GONDERI));
         assert_eq!(app.gerekli_platformlar, vec!["tunix-os"]);
+    }
+
+    #[test]
+    fn genis_paket_yirmi_dort_hizmet_tasiyor() {
+        let ids = standart_hizmetler().into_iter().filter(|x| {
+            x.hizmet_kimligi.starts_with("metin.") ||
+            x.hizmet_kimligi.starts_with("dizi.") ||
+            x.hizmet_kimligi.starts_with("arama.") ||
+            x.hizmet_kimligi.starts_with("bildirim.") ||
+            matches!(x.hizmet_kimligi, "veri.filtrele"|"veri.temizle"|"veri.normalize-et"|"veri.gruplandir"|"veri.birlestir"|"veri.korelasyon")
+        }).count();
+        assert!(ids >= 24);
     }
 }
