@@ -49,6 +49,20 @@ public static class MotorAyarlariDogrulayicisi
                 "en az 256 byte olmalıdır.");
         }
 
+        if (ayarlar.CanliPanoPortu is < 1 or > 65_535)
+        {
+            throw new InvalidOperationException(
+                "Canlı pano portu 1-65535 " +
+                "arasında olmalıdır.");
+        }
+
+        if (ayarlar.CanliPanoYenilemeMs is < 250 or > 60_000)
+        {
+            throw new InvalidOperationException(
+                "Canlı pano yenileme süresi " +
+                "250-60000 ms arasında olmalıdır.");
+        }
+
         if (ayarlar.Sirketler is null ||
             ayarlar.Sirketler.Count == 0)
         {
