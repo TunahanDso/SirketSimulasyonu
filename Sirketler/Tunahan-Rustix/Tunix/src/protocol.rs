@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub const PROTOKOL_SURUMU: &str = "0.1";
 pub const SIRKET_KIMLIGI: &str = "tunahan-tunix";
 pub const SIRKET_ADI: &str = "Tunix";
-pub const SUNUCU_SURUMU: &str = "0.4.0";
+pub const SUNUCU_SURUMU: &str = "0.5.0";
 pub const MATEMATIK_TOPLA: &str = "matematik.topla";
 pub const MATEMATIK_TOPLA_SURUMU: &str = "1.0";
 pub const MATEMATIK_CARP: &str = "matematik.carp";
@@ -53,6 +53,32 @@ pub struct SaglikKontroluMesaji {
     pub protokol_surumu: String,
     pub istek_kimligi: String,
     pub tick_numarasi: i64,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinansDurumuMesaji {
+    pub mesaj_turu: String,
+    pub mesaj_kimligi: String,
+    pub protokol_surumu: String,
+    pub sirket_kimligi: String,
+    pub tick_numarasi: i64,
+    pub kasa: Decimal,
+    pub toplam_gelir: Decimal,
+    pub toplam_iade: Decimal,
+    pub toplam_ceza: Decimal,
+    pub bekleyen_odeme: Decimal,
+    pub net_gelir: Decimal,
+    pub tamamlanan_is_sayisi: u64,
+    pub basarisiz_is_sayisi: u64,
+    pub zaman_asimina_ugrayan_is_sayisi: u64,
+    pub iptal_edilen_is_sayisi: u64,
+    pub itibar_puani: f64,
+    pub guvenilirlik_puani: f64,
+    pub ortalama_musteri_memnuniyeti: f64,
+    #[serde(default)]
+    pub guncellenme_zamani: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -156,5 +182,18 @@ mod tests {
         assert_eq!(hizmetler[2]["hizmetKimligi"], VERI_ORTALAMA_HESAPLA);
         assert_eq!(hizmetler[3]["hizmetKimligi"], METIN_KELIME_SAY);
         assert_eq!(hizmetler[4]["hizmetKimligi"], METIN_KARAKTER_SAY);
+    }
+
+    #[test]
+    fn finans_durumu_mesajini_okur() {
+        let mesaj: FinansDurumuMesaji = serde_json::from_str(
+            r#"{"mesajTuru":"finansDurumu","mesajKimligi":"m1","protokolSurumu":"0.1","sirketKimligi":"tunahan-tunix","tickNumarasi":12,"kasa":12.50,"toplamGelir":15,"toplamIade":1,"toplamCeza":1.50,"bekleyenOdeme":0,"netGelir":12.50,"tamamlananIsSayisi":8,"basarisizIsSayisi":1,"zamanAsiminaUgrayanIsSayisi":0,"iptalEdilenIsSayisi":0,"itibarPuani":55,"guvenilirlikPuani":60,"ortalamaMusteriMemnuniyeti":75,"guncellenmeZamani":"2026-07-19T10:00:00Z"}"#,
+        )
+        .expect("finans mesajı ayrıştırılmalı");
+
+        assert_eq!(mesaj.sirket_kimligi, SIRKET_KIMLIGI);
+        assert_eq!(mesaj.tick_numarasi, 12);
+        assert_eq!(mesaj.kasa, Decimal::new(1250, 2));
+        assert_eq!(mesaj.net_gelir, Decimal::new(1250, 2));
     }
 }
