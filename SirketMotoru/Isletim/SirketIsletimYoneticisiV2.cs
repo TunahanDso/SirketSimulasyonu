@@ -614,7 +614,7 @@ public sealed class SirketIsletimYoneticisi : IAsyncDisposable
         int kullanici = durum.Urunler.Where(u => u.Aktif).Sum(u => u.AktifKullaniciSayisi);
         decimal yatirimBakim = Yatirimlar.Sum(p => YatirimBakimGideri(p.YatirimTuru, Seviye(durum, p.YatirimTuru)));
         decimal tutar = 420m + hizmet * 42m + hizmetKapasite * 10m + urun * 180m + kullanici * 0.48m + yatirimBakim;
-        tutar += durum.TeknikBorc * 14m + durum.BakimBaskisi * 8m;
+        tutar += (decimal)durum.TeknikBorc * 14m + (decimal)durum.BakimBaskisi * 8m;
         foreach (UrunKaydi u in durum.Urunler.Where(u => u.Aktif))
         {
             tutar += u.UrunTuru switch { "isletim-sistemi" => 480m, "platform" => 390m, "altyapi" => 310m, _ => 120m };

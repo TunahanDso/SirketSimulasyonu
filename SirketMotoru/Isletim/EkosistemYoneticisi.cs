@@ -426,7 +426,7 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
     private static void VarsayilanProtokoluUygula(UrunDagitimAyari ayar, JsonObject? uygulama, bool mevcutAktiflik)
     {
         if (ayar.KullaniciTarafindanYapilandirildi) return;
-        ayar.BaglantiProtokoluKimligi = (uygulama?["desteklenenProtokoller"] as JsonArray)?.Select(Str).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? string.Empty;
+        ayar.BaglantiProtokoluKimligi = (uygulama?["desteklenenProtokoller"] as JsonArray)?.Select(x => Str(x)).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? string.Empty;
         ayar.ElleAktifOlmasiIsteniyor = mevcutAktiflik;
     }
 
@@ -561,7 +561,7 @@ public sealed class EkosistemYoneticisi : IAsyncDisposable
 
     private static IReadOnlyList<string> ProtokolListesi(JsonObject? uygulama, UrunDagitimAyari ayar)
     {
-        List<string> liste = (uygulama?["desteklenenProtokoller"] as JsonArray)?.Select(Str).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? [];
+        List<string> liste = (uygulama?["desteklenenProtokoller"] as JsonArray)?.Select(x => Str(x)).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? [];
         if (!string.IsNullOrWhiteSpace(ayar.BaglantiProtokoluKimligi) && !liste.Contains(ayar.BaglantiProtokoluKimligi, StringComparer.OrdinalIgnoreCase)) liste.Add(ayar.BaglantiProtokoluKimligi);
         return liste.AsReadOnly();
     }
