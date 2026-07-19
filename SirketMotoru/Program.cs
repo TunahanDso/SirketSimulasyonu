@@ -1,6 +1,6 @@
-﻿
 using System.Text.Json;
 using SirketMotoru.Ayarlar;
+using SirketMotoru.CanliPano;
 using SirketMotoru.Hizmetler;
 using SirketMotoru.Kayit;
 using SirketMotoru.Musteriler;
@@ -154,14 +154,25 @@ try
             motorAyarlari,
             hizmetKatalogu);
 
-    await sirketYoneticisi.IlkBaglantilariKurAsync(
-        iptalKaynagi.Token);
-
     TickYoneticisi tickYoneticisi =
         new(
             motorAyarlari,
             sirketYoneticisi,
             musteriYoneticisi);
+
+    await using CanliPanoSunucusu canliPanoSunucusu =
+        new(
+            motorAyarlari,
+            sirketYoneticisi,
+            musteriYoneticisi,
+            hizmetKatalogu,
+            () => tickYoneticisi.TickNumarasi);
+
+    await canliPanoSunucusu.BaslatAsync(
+        iptalKaynagi.Token);
+
+    await sirketYoneticisi.IlkBaglantilariKurAsync(
+        iptalKaynagi.Token);
 
     await tickYoneticisi.BaslatAsync(
         iptalKaynagi.Token);
