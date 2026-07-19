@@ -8,62 +8,44 @@ public sealed class SirketBilancoVeritabani
     private static readonly JsonSerializerOptions JsonAyarlari =
         new()
         {
-            PropertyNamingPolicy =
-                JsonNamingPolicy.CamelCase,
-
-            PropertyNameCaseInsensitive =
-                true,
-
-            WriteIndented =
-                true
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true,
+            WriteIndented = true
         };
 
     private readonly string _dosyaYolu;
+    private readonly SemaphoreSlim _dosyaKilidi = new(1, 1);
 
-    private readonly SemaphoreSlim _dosyaKilidi =
-        new(1, 1);
-
-    public string DosyaYolu =>
-        _dosyaYolu;
+    public string DosyaYolu => _dosyaYolu;
 
     public SirketBilancoVeritabani()
         : this(VarsayilanDosyaYolunuBul())
     {
     }
 
-    public SirketBilancoVeritabani(
-        string dosyaYolu)
+    public SirketBilancoVeritabani(string dosyaYolu)
     {
-        if (string.IsNullOrWhiteSpace(
-                dosyaYolu))
+        if (string.IsNullOrWhiteSpace(dosyaYolu))
         {
             throw new ArgumentException(
                 "Şirket bilanço dosya yolu boş olamaz.",
                 nameof(dosyaYolu));
         }
 
-        _dosyaYolu =
-            Path.GetFullPath(
-                dosyaYolu);
+        _dosyaYolu = Path.GetFullPath(dosyaYolu);
     }
 
-    public IReadOnlyDictionary<string, SirketBilancoKaydi>
-        Yukle()
+    public IReadOnlyDictionary<string, SirketBilancoKaydi> Yukle()
     {
-        if (!File.Exists(
-                _dosyaYolu))
+        if (!File.Exists(_dosyaYolu))
         {
             return new Dictionary<string, SirketBilancoKaydi>(
                 StringComparer.OrdinalIgnoreCase);
         }
 
-        string json =
-            File.ReadAllText(
-                _dosyaYolu,
-                Encoding.UTF8);
+        string json = File.ReadAllText(_dosyaYolu, Encoding.UTF8);
 
-        if (string.IsNullOrWhiteSpace(
-                json))
+        if (string.IsNullOrWhiteSpace(json))
         {
             return new Dictionary<string, SirketBilancoKaydi>(
                 StringComparer.OrdinalIgnoreCase);
@@ -84,8 +66,7 @@ public sealed class SirketBilancoVeritabani
             .Where(
                 kayit =>
                     kayit is not null &&
-                    !string.IsNullOrWhiteSpace(
-                        kayit.SirketKimligi))
+                    !string.IsNullOrWhiteSpace(kayit.SirketKimligi))
             .GroupBy(
                 kayit => kayit.SirketKimligi,
                 StringComparer.OrdinalIgnoreCase)
@@ -99,73 +80,52 @@ public sealed class SirketBilancoVeritabani
         IEnumerable<SirketKaydi> sirketler,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(
-            sirketler);
-
-        await _dosyaKilidi.WaitAsync(
-            cancellationToken);
-
-        string geciciDosyaYolu =
-            _dosyaYolu + ".tmp";
+        ArgumentNullException.ThrowIfNull(sirketler);
+        await _dosyaKilidi.WaitAsync(cancellationToken);
+        string geciciDosyaYolu = _dosyaYolu + ".tmp";
 
         try
         {
-            string? klasor =
-                Path.GetDirectoryName(
-                    _dosyaYolu);
+            string? klasor = Path.GetDirectoryName(_dosyaYolu);
 
-            if (!string.IsNullOrWhiteSpace(
-                    klasor))
+            if (!string.IsNullOrWhiteSpace(klasor))
             {
-                Directory.CreateDirectory(
-                    klasor);
+                Directory.CreateDirectory(klasor);
             }
 
             SirketBilancoDosyasi dosya =
                 new()
                 {
-                    Surum = 1,
-                    GuncellenmeZamani =
-                        DateTimeOffset.UtcNow,
-                    Sirketler =
-                        sirketler
-                            .OrderBy(
-                                sirket =>
-                                    sirket.SirketKimligi,
-                                StringComparer.OrdinalIgnoreCase)
-                            .Select(
-                                SirketBilancoKaydi.Olustur)
-                            .ToList()
+                    Surum = 2,
+                    GuncellenmeZamani = DateTimeOffset.UtcNow,
+                    Sirketler = sirketler
+                        .OrderBy(
+                            sirket => sirket.SirketKimligi,
+                            StringComparer.OrdinalIgnoreCase)
+                        .Select(SirketBilancoKaydi.Olustur)
+                        .ToList()
                 };
 
-            string json =
-                JsonSerializer.Serialize(
-                    dosya,
-                    JsonAyarlari);
+            string json = JsonSerializer.Serialize(dosya, JsonAyarlari);
 
             await File.WriteAllTextAsync(
                 geciciDosyaYolu,
                 json,
-                new UTF8Encoding(
-                    encoderShouldEmitUTF8Identifier:
-                        false),
+                new UTF8Encoding(false),
                 cancellationToken);
 
             File.Move(
                 geciciDosyaYolu,
                 _dosyaYolu,
-                overwrite:
-                    true);
+                overwrite: true);
         }
         finally
         {
             try
             {
-                if (File.Exists(
-                        geciciDosyaYolu))
+                if (File.Exists(geciciDosyaYolu))
                 {
-                    File.Delete(
-                        geciciDosyaYolu);
+                    File.Delete(geciciDosyaYolu);
                 }
             }
             catch
@@ -181,53 +141,20 @@ public sealed class SirketBilancoVeritabani
     {
         string[] olasiKlasorler =
         [
-            Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "MotorVerileri"),
-
-            Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "..",
-                "MotorVerileri"),
-
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "MotorVerileri"),
-
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "..",
-                "MotorVerileri"),
-
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "..",
-                "..",
-                "..",
-                "MotorVerileri"),
-
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "..",
-                "..",
-                "..",
-                "..",
-                "MotorVerileri")
+            Path.Combine(Directory.GetCurrentDirectory(), "MotorVerileri"),
+            Path.Combine(Directory.GetCurrentDirectory(), "..", "MotorVerileri"),
+            Path.Combine(AppContext.BaseDirectory, "MotorVerileri"),
+            Path.Combine(AppContext.BaseDirectory, "..", "MotorVerileri"),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "MotorVerileri"),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "MotorVerileri")
         ];
 
-        foreach (string klasor in
-                 olasiKlasorler)
+        foreach (string klasor in olasiKlasorler)
         {
-            string tamKlasor =
-                Path.GetFullPath(
-                    klasor);
+            string tamKlasor = Path.GetFullPath(klasor);
 
-            if (Directory.Exists(
-                    tamKlasor) &&
-                File.Exists(
-                    Path.Combine(
-                        tamKlasor,
-                        "motor-ayarlari.json")))
+            if (Directory.Exists(tamKlasor) &&
+                File.Exists(Path.Combine(tamKlasor, "motor-ayarlari.json")))
             {
                 return Path.Combine(
                     tamKlasor,
@@ -235,171 +162,120 @@ public sealed class SirketBilancoVeritabani
             }
         }
 
-        string varsayilanKlasor =
-            Path.GetFullPath(
-                olasiKlasorler[0]);
-
         return Path.Combine(
-            varsayilanKlasor,
+            Path.GetFullPath(olasiKlasorler[0]),
             "sirket-bilancolari.json");
     }
 }
 
 public sealed class SirketBilancoDosyasi
 {
-    public int Surum { get; set; } = 1;
-
+    public int Surum { get; set; } = 2;
     public DateTimeOffset GuncellenmeZamani { get; set; } =
         DateTimeOffset.UtcNow;
-
-    public List<SirketBilancoKaydi> Sirketler { get; set; } =
-        [];
+    public List<SirketBilancoKaydi> Sirketler { get; set; } = [];
 }
 
 public sealed class SirketBilancoKaydi
 {
-    public string SirketKimligi { get; set; } =
-        string.Empty;
-
-    public string SirketAdi { get; set; } =
-        string.Empty;
-
+    public string SirketKimligi { get; set; } = string.Empty;
+    public string SirketAdi { get; set; } = string.Empty;
     public decimal Kasa { get; set; }
-
     public decimal ToplamGelir { get; set; }
-
     public decimal ToplamIade { get; set; }
-
     public decimal ToplamCeza { get; set; }
-
     public decimal BekleyenOdeme { get; set; }
-
+    public decimal ToplamGuvenlikKaybi { get; set; }
     public double ItibarPuani { get; set; } = 50;
-
     public double GuvenilirlikPuani { get; set; } = 50;
-
+    public double KodKalitesiPuani { get; set; } = 50;
+    public double PerformansPuani { get; set; } = 50;
+    public double GuvenlikPuani { get; set; } = 50;
     public double OrtalamaMusteriMemnuniyeti { get; set; } = 50;
-
     public int TamamlananIsSayisi { get; set; }
-
     public int BasarisizIsSayisi { get; set; }
-
     public int ZamanAsiminaUgrayanIsSayisi { get; set; }
-
     public int IptalEdilenIsSayisi { get; set; }
-
     public int ReddedilenIsSayisi { get; set; }
-
+    public int EngellenenSaldiriSayisi { get; set; }
+    public int BasariliSaldiriSayisi { get; set; }
     public long ToplamIslemSuresiMs { get; set; }
-
     public DateTimeOffset? SonBasariliIsZamani { get; set; }
-
     public DateTimeOffset? SonBasarisizIsZamani { get; set; }
 
-    public static SirketBilancoKaydi Olustur(
-        SirketKaydi sirket)
+    public static SirketBilancoKaydi Olustur(SirketKaydi sirket)
     {
-        ArgumentNullException.ThrowIfNull(
-            sirket);
+        ArgumentNullException.ThrowIfNull(sirket);
 
         return new SirketBilancoKaydi
         {
-            SirketKimligi =
-                sirket.SirketKimligi,
-            SirketAdi =
-                sirket.SirketAdi,
-            Kasa =
-                sirket.Kasa,
-            ToplamGelir =
-                sirket.ToplamGelir,
-            ToplamIade =
-                sirket.ToplamIade,
-            ToplamCeza =
-                sirket.ToplamCeza,
-            BekleyenOdeme =
-                sirket.BekleyenOdeme,
-            ItibarPuani =
-                sirket.ItibarPuani,
-            GuvenilirlikPuani =
-                sirket.GuvenilirlikPuani,
+            SirketKimligi = sirket.SirketKimligi,
+            SirketAdi = sirket.SirketAdi,
+            Kasa = sirket.Kasa,
+            ToplamGelir = sirket.ToplamGelir,
+            ToplamIade = sirket.ToplamIade,
+            ToplamCeza = sirket.ToplamCeza,
+            BekleyenOdeme = sirket.BekleyenOdeme,
+            ToplamGuvenlikKaybi = sirket.ToplamGuvenlikKaybi,
+            ItibarPuani = sirket.ItibarPuani,
+            GuvenilirlikPuani = sirket.GuvenilirlikPuani,
+            KodKalitesiPuani = sirket.KodKalitesiPuani,
+            PerformansPuani = sirket.PerformansPuani,
+            GuvenlikPuani = sirket.GuvenlikPuani,
             OrtalamaMusteriMemnuniyeti =
                 sirket.OrtalamaMusteriMemnuniyeti,
-            TamamlananIsSayisi =
-                sirket.TamamlananIsSayisi,
-            BasarisizIsSayisi =
-                sirket.BasarisizIsSayisi,
+            TamamlananIsSayisi = sirket.TamamlananIsSayisi,
+            BasarisizIsSayisi = sirket.BasarisizIsSayisi,
             ZamanAsiminaUgrayanIsSayisi =
                 sirket.ZamanAsiminaUgrayanIsSayisi,
-            IptalEdilenIsSayisi =
-                sirket.IptalEdilenIsSayisi,
-            ReddedilenIsSayisi =
-                sirket.ReddedilenIsSayisi,
-            ToplamIslemSuresiMs =
-                sirket.ToplamIslemSuresiMs,
-            SonBasariliIsZamani =
-                sirket.SonBasariliIsZamani,
-            SonBasarisizIsZamani =
-                sirket.SonBasarisizIsZamani
+            IptalEdilenIsSayisi = sirket.IptalEdilenIsSayisi,
+            ReddedilenIsSayisi = sirket.ReddedilenIsSayisi,
+            EngellenenSaldiriSayisi = sirket.EngellenenSaldiriSayisi,
+            BasariliSaldiriSayisi = sirket.BasariliSaldiriSayisi,
+            ToplamIslemSuresiMs = sirket.ToplamIslemSuresiMs,
+            SonBasariliIsZamani = sirket.SonBasariliIsZamani,
+            SonBasarisizIsZamani = sirket.SonBasarisizIsZamani
         };
     }
 
-    public void Uygula(
-        SirketKaydi sirket)
+    public void Uygula(SirketKaydi sirket)
     {
-        ArgumentNullException.ThrowIfNull(
-            sirket);
+        ArgumentNullException.ThrowIfNull(sirket);
 
-        sirket.Kasa =
-            Math.Max(0, Kasa);
-        sirket.ToplamGelir =
-            Math.Max(0, ToplamGelir);
-        sirket.ToplamIade =
-            Math.Max(0, ToplamIade);
-        sirket.ToplamCeza =
-            Math.Max(0, ToplamCeza);
-        sirket.BekleyenOdeme =
-            Math.Max(0, BekleyenOdeme);
-        sirket.ItibarPuani =
-            SinirlaPuani(ItibarPuani);
-        sirket.GuvenilirlikPuani =
-            SinirlaPuani(GuvenilirlikPuani);
+        sirket.Kasa = Math.Max(0, Kasa);
+        sirket.ToplamGelir = Math.Max(0, ToplamGelir);
+        sirket.ToplamIade = Math.Max(0, ToplamIade);
+        sirket.ToplamCeza = Math.Max(0, ToplamCeza);
+        sirket.BekleyenOdeme = Math.Max(0, BekleyenOdeme);
+        sirket.ToplamGuvenlikKaybi = Math.Max(0, ToplamGuvenlikKaybi);
+        sirket.ItibarPuani = SinirlaPuani(ItibarPuani);
+        sirket.GuvenilirlikPuani = SinirlaPuani(GuvenilirlikPuani);
+        sirket.KodKalitesiPuani = SinirlaPuani(KodKalitesiPuani);
+        sirket.PerformansPuani = SinirlaPuani(PerformansPuani);
+        sirket.GuvenlikPuani = SinirlaPuani(GuvenlikPuani);
         sirket.OrtalamaMusteriMemnuniyeti =
-            SinirlaPuani(
-                OrtalamaMusteriMemnuniyeti);
-        sirket.TamamlananIsSayisi =
-            Math.Max(0, TamamlananIsSayisi);
-        sirket.BasarisizIsSayisi =
-            Math.Max(0, BasarisizIsSayisi);
+            SinirlaPuani(OrtalamaMusteriMemnuniyeti);
+        sirket.TamamlananIsSayisi = Math.Max(0, TamamlananIsSayisi);
+        sirket.BasarisizIsSayisi = Math.Max(0, BasarisizIsSayisi);
         sirket.ZamanAsiminaUgrayanIsSayisi =
-            Math.Max(
-                0,
-                ZamanAsiminaUgrayanIsSayisi);
-        sirket.IptalEdilenIsSayisi =
-            Math.Max(0, IptalEdilenIsSayisi);
-        sirket.ReddedilenIsSayisi =
-            Math.Max(0, ReddedilenIsSayisi);
-        sirket.ToplamIslemSuresiMs =
-            Math.Max(0, ToplamIslemSuresiMs);
-        sirket.SonBasariliIsZamani =
-            SonBasariliIsZamani;
-        sirket.SonBasarisizIsZamani =
-            SonBasarisizIsZamani;
-        sirket.AktifIsSayisi =
-            0;
+            Math.Max(0, ZamanAsiminaUgrayanIsSayisi);
+        sirket.IptalEdilenIsSayisi = Math.Max(0, IptalEdilenIsSayisi);
+        sirket.ReddedilenIsSayisi = Math.Max(0, ReddedilenIsSayisi);
+        sirket.EngellenenSaldiriSayisi = Math.Max(0, EngellenenSaldiriSayisi);
+        sirket.BasariliSaldiriSayisi = Math.Max(0, BasariliSaldiriSayisi);
+        sirket.ToplamIslemSuresiMs = Math.Max(0, ToplamIslemSuresiMs);
+        sirket.SonBasariliIsZamani = SonBasariliIsZamani;
+        sirket.SonBasarisizIsZamani = SonBasarisizIsZamani;
+        sirket.AktifIsSayisi = 0;
     }
 
-    private static double SinirlaPuani(
-        double puan)
+    private static double SinirlaPuani(double puan)
     {
-        if (double.IsNaN(puan) ||
-            double.IsInfinity(puan))
+        if (double.IsNaN(puan) || double.IsInfinity(puan))
         {
             return 50;
         }
 
-        return Math.Clamp(
-            puan,
-            0,
-            100);
+        return Math.Clamp(puan, 0, 100);
     }
 }
