@@ -8,7 +8,8 @@ namespace SirketMotoru.Tick;
 /// <summary>
 /// Sunucusu kapalı olan şirketin hizmet ve uygulama tanımlarına dokunmadan
 /// bilanço, puan, kredi, yatırım, ürün ve finans defterini tick boyunca dondurur.
-/// Global tick ve bağlı şirketler normal biçimde çalışmaya devam eder.
+/// Kapalı şirketin uygulamaları o tickte piyasaya katılmaz; global tick ve bağlı
+/// şirketler normal biçimde çalışmaya devam eder.
 /// </summary>
 public sealed class BaglantiBazliSirketDonmaYoneticisi
 {
@@ -99,7 +100,7 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
             _sirketAnliklari[sirket.SirketKimligi] = Al(sirket);
 
         if (_sirketAnliklari.Count == 0) return;
-        await IsletimAnliklariniAlAsync(cancellationToken);
+        await IsletimAnliklariniAlVePazardanCikarAsync(cancellationToken);
         await FinansAnliklariniAlAsync(cancellationToken);
     }
 
@@ -107,17 +108,19 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
     {
         if (_sirketAnliklari.Count == 0) return;
 
-        await IsletimiGeriYukleAsync(cancellationToken);
+        // Bilanço kaydı yazılmadan önce şirketin kamuya açık finans alanları geri konur.
         foreach ((string kimlik, SirketAnlik anlik) in _sirketAnliklari)
         {
             SirketKaydi? sirket = _sirketler.SirketKayitlari.FirstOrDefault(x =>
                 x.SirketKimligi.Equals(kimlik, StringComparison.OrdinalIgnoreCase));
             if (sirket is not null) Uygula(sirket, anlik);
         }
+
+        await IsletimiGeriYukleAsync(cancellationToken);
         await FinansiGeriYukleAsync(tickNumarasi, cancellationToken);
     }
 
-    private async Task IsletimAnliklariniAlAsync(CancellationToken cancellationToken)
+    private async Task IsletimAnliklariniAlVePazardanCikarAsync(CancellationToken cancellationToken)
     {
         SemaphoreSlim kilit = (SemaphoreSlim)(_kilitAlani.GetValue(_temel)
             ?? throw new InvalidOperationException("İşletim kilidi boş."));
@@ -128,7 +131,12 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
                 ?? throw new InvalidOperationException("İşletim verisi boş."));
             foreach (SirketIsletimDurumu durum in veri.Sirketler
                          .Where(x => _sirketAnliklari.ContainsKey(x.SirketKimligi)))
+            {
                 _isletimAnliklari[durum.SirketKimligi] = Kopyala(durum);
+                foreach (UrunKaydi urun in durum.Urunler)
+                    urun.Aktif = false;
+                durum.ToplamAboneSayisi = 0;
+            }
         }
         finally { kilit.Release(); }
     }
