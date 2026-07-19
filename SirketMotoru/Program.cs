@@ -36,20 +36,24 @@ try
     HizmetKatalogAyarlari tohumKatalog = await JsonDosyasiniOkuAsync<HizmetKatalogAyarlari>(katalogDosyasiYolu, jsonAyarlari, iptalKaynagi.Token);
     HizmetKatalogAyarlari katalogAyarlari = StandartKatalogV6.Genislet(tohumKatalog);
     HizmetKatalogu hizmetKatalogu = new(katalogAyarlari);
-    KonsolKayitcisi.Basari($"V8 hizmet kataloğu yüklendi | Sürüm: {hizmetKatalogu.KatalogSurumu} | Aktif: {hizmetKatalogu.Hizmetler.Count(h => h.Aktif)} | Uygulama kategorisi: {StandartKatalogV6.UygulamaKategorileri.Count}");
+    KonsolKayitcisi.Basari($"V8.1 hizmet kataloğu yüklendi | Sürüm: {hizmetKatalogu.KatalogSurumu} | Aktif: {hizmetKatalogu.Hizmetler.Count(h => h.Aktif)} | Uygulama kategorisi: {StandartKatalogV6.UygulamaKategorileri.Count}");
 
     string musteriDosyasiYolu = Path.Combine(motorVerileriKlasoru, "musteriler.json");
     MusteriVeritabani musteriVeritabani = new(musteriDosyasiYolu);
-    await musteriVeritabani.YukleVeyaOlusturAsync(20_000, iptalKaynagi.Token);
     await using MusteriYoneticisi musteriYoneticisi = new(musteriVeritabani, hizmetKatalogu);
     await musteriYoneticisi.BaslatAsync(iptalKaynagi.Token);
     MusteriIsletimSistemiYoneticisi musteriIsletimSistemiYoneticisi = new(musteriYoneticisi);
     KonsolKayitcisi.Basari($"Müşteri sistemi hazır | Toplam: {musteriYoneticisi.Musteriler.Count} | Aktif: {musteriYoneticisi.AktifMusteriSayisi}");
 
     await using SirketYoneticisi sirketYoneticisi = new(motorAyarlari, hizmetKatalogu);
+    await V81SezonMigrasyonu.UygulaAsync(
+        sirketYoneticisi,
+        motorVerileriKlasoru,
+        iptalKaynagi.Token);
+
     CezaV8Deposu.Baslat(motorVerileriKlasoru);
     CezaV8Deposu.LegacyCezalariUzlastir(sirketYoneticisi.SirketKayitlari);
-    KonsolKayitcisi.Basari("Adil Ceza V8 hazır | Motor sözleşme kusurları ayrıştırılır, tick cezası sınırlıdır.");
+    KonsolKayitcisi.Basari("Adil Ceza V8.1 hazır | Motor sözleşme kusurları ayrıştırılır, tick cezası sınırlıdır.");
     await BaslangicMigrasyonlari.YonetimHesaplariniHazirlaAsync(motorVerileriKlasoru, iptalKaynagi.Token);
 
     await using KodTabanliSirketIsletimYoneticisi isletimYoneticisi = new(sirketYoneticisi, motorVerileriKlasoru);
