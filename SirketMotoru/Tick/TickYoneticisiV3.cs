@@ -141,7 +141,6 @@ public sealed class TickYoneticisi
         cancellationToken.ThrowIfCancellationRequested();
         CezaV8Deposu.TickBaslat(tickNumarasi);
 
-        // Önce yeniden bağlantı ve sağlık kontrolü yapılır. O anda bağlı kalanlar oynar.
         await _sirketYoneticisi.TickCalistirAsync(
             tickNumarasi,
             cancellationToken);
@@ -149,7 +148,8 @@ public sealed class TickYoneticisi
         BaglantiBazliSirketDonmaYoneticisi donma = new(
             _sirketYoneticisi,
             _isletimYoneticisi,
-            _finansV7Yoneticisi);
+            _finansV7Yoneticisi,
+            _ekonomiV6Yoneticisi);
         await donma.TickOncesiAsync(cancellationToken);
 
         try
@@ -192,20 +192,21 @@ public sealed class TickYoneticisi
                     cancellationToken);
             CanliPanoDurumDeposu.IslemeOzetiniGuncelle(islemeOzeti);
 
-            // Eski katmanların kapalı şirkete yazdığı değişiklikler kapanıştan önce geri alınır.
-            await donma.GeriYukleAsync(tickNumarasi, cancellationToken);
-
+            // Kapalı uygulamalar pasifken müşteri CV ve piyasa grafik kapanışı yapılır.
             await _ekonomiV6Yoneticisi.TickSonuAsync(
                 tickNumarasi,
                 cancellationToken);
             await _ekonomiDengeV7Yoneticisi.TickSonuAsync(
                 tickNumarasi,
                 cancellationToken);
+
+            // Finans kapanışından önce kapalı şirketin bilanço ve V6 geçmişi geri alınır.
+            await donma.GeriYukleAsync(tickNumarasi, cancellationToken);
             await _finansV7Yoneticisi.TickSonuAsync(
                 tickNumarasi,
                 cancellationToken);
 
-            // Finans ve grafik kapanış katmanları da kapalı şirkete dokunamaz.
+            // Otomatik kredi/haber gibi finans kapanış yan etkileri de kapalı şirkette kalamaz.
             await donma.GeriYukleAsync(tickNumarasi, cancellationToken);
             CezaV8Deposu.TickBitir(tickNumarasi);
             await _sirketYoneticisi.BilancolariKaydetVeYayinlaAsync(
