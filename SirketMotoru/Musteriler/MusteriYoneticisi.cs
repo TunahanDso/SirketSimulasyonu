@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using SirketMotoru.Hizmetler;
 using SirketMotoru.Isler;
 using SirketMotoru.Kayit;
@@ -6,58 +8,40 @@ namespace SirketMotoru.Musteriler;
 
 public sealed class MusteriYoneticisi : IAsyncDisposable
 {
-    private const int VarsayilanMusteriSayisi = 2_000;
+    private const int VarsayilanMusteriSayisi = 5_000;
 
     private readonly MusteriVeritabani _musteriVeritabani;
-
     private readonly HizmetKatalogu _hizmetKatalogu;
-
     private readonly Random _rastgele;
-
-    private readonly SemaphoreSlim _kayitKilidi =
-        new(1, 1);
-
+    private readonly SemaphoreSlim _kayitKilidi = new(1, 1);
     private readonly Dictionary<string, Musteri> _musteriIndeksi =
         new(StringComparer.OrdinalIgnoreCase);
 
     private long _sonKayitTicki;
-
     private bool _baslatildi;
 
     public IReadOnlyList<Musteri> Musteriler =>
         _musteriVeritabani.Musteriler;
 
     public int AktifMusteriSayisi =>
-        Musteriler.Count(
-            musteri => musteri.Aktif);
+        Musteriler.Count(musteri => musteri.Aktif);
 
     public decimal ToplamMusteriBakiyesi =>
-        Musteriler.Sum(
-            musteri => musteri.Bakiye);
+        Musteriler.Sum(musteri => musteri.Bakiye);
 
     public decimal ToplamMusteriHarcamasi =>
-        Musteriler.Sum(
-            musteri => musteri.ToplamHarcama);
+        Musteriler.Sum(musteri => musteri.ToplamHarcama);
 
     public MusteriYoneticisi(
         MusteriVeritabani musteriVeritabani,
         HizmetKatalogu hizmetKatalogu,
         int rastgeleTohum = 1881)
     {
-        ArgumentNullException.ThrowIfNull(
-            musteriVeritabani);
-
-        ArgumentNullException.ThrowIfNull(
-            hizmetKatalogu);
-
-        _musteriVeritabani =
-            musteriVeritabani;
-
-        _hizmetKatalogu =
-            hizmetKatalogu;
-
-        _rastgele =
-            new Random(rastgeleTohum);
+        ArgumentNullException.ThrowIfNull(musteriVeritabani);
+        ArgumentNullException.ThrowIfNull(hizmetKatalogu);
+        _musteriVeritabani = musteriVeritabani;
+        _hizmetKatalogu = hizmetKatalogu;
+        _rastgele = new Random(rastgeleTohum);
     }
 
     public async Task BaslatAsync(
@@ -68,15 +52,11 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
             return;
         }
 
-        await _musteriVeritabani
-            .YukleVeyaOlusturAsync(
-                VarsayilanMusteriSayisi,
-                cancellationToken);
-
+        await _musteriVeritabani.YukleVeyaOlusturAsync(
+            VarsayilanMusteriSayisi,
+            cancellationToken);
         MusteriIndeksiniOlustur();
-
         MusterileriDogrula();
-
         _baslatildi = true;
 
         KonsolKayitcisi.Basari(
@@ -86,11 +66,9 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
             $"Toplam bakiye: {ToplamMusteriBakiyesi:N2}");
     }
 
-    public Musteri? MusteriyiBul(
-        string musteriKimligi)
+    public Musteri? MusteriyiBul(string musteriKimligi)
     {
-        if (string.IsNullOrWhiteSpace(
-                musteriKimligi))
+        if (string.IsNullOrWhiteSpace(musteriKimligi))
         {
             return null;
         }
@@ -98,81 +76,76 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
         _musteriIndeksi.TryGetValue(
             musteriKimligi.Trim(),
             out Musteri? musteri);
-
         return musteri;
     }
 
-    public IReadOnlyList<Musteri>
-        TalepOlusturacakMusterileriSec(
-            long tickNumarasi)
+    public IReadOnlyList<Musteri> TalepOlusturacakMusterileriSec(
+        long tickNumarasi)
     {
         BaslatilmisOlmasiniDogrula();
-
         List<Musteri> secilenMusteriler = [];
+        double tickEtkisi = TickTalepCarpaniHesapla(tickNumarasi);
 
         foreach (Musteri musteri in Musteriler)
         {
-            if (!MusteriTalepOlusturabilirMi(
-                    musteri))
+            if (!MusteriTalepOlusturabilirMi(musteri))
             {
                 continue;
             }
 
-            double tickEtkisi =
-                TickTalepCarpaniHesapla(
-                    tickNumarasi);
-
             double sonOlasilik =
                 Math.Clamp(
-                    musteri.TalepOlusturmaOlasiligi *
-                    tickEtkisi,
+                    musteri.TalepOlusturmaOlasiligi * tickEtkisi,
                     0,
                     1);
 
-            if (_rastgele.NextDouble() <=
-                sonOlasilik)
+            if (_rastgele.NextDouble() <= sonOlasilik)
             {
-                secilenMusteriler.Add(
-                    musteri);
+                secilenMusteriler.Add(musteri);
             }
         }
 
         return secilenMusteriler;
     }
 
-    public IReadOnlyList<HizmetTalebi>
-        TickTalepleriniOlustur(
-            long tickNumarasi)
+    public IReadOnlyList<HizmetTalebi> TickTalepleriniOlustur(
+        long tickNumarasi)
     {
         BaslatilmisOlmasiniDogrula();
-
         IReadOnlyList<Musteri> talepSahipleri =
-            TalepOlusturacakMusterileriSec(
-                tickNumarasi);
-
+            TalepOlusturacakMusterileriSec(tickNumarasi);
         List<HizmetTalebi> talepler =
-            new(talepSahipleri.Count);
+            new(talepSahipleri.Count * 2);
 
-        foreach (Musteri musteri in
-                 talepSahipleri)
+        foreach (Musteri musteri in talepSahipleri)
         {
-            HizmetTalebi? talep =
-                MusteriIcinTalepOlustur(
-                    musteri,
-                    tickNumarasi);
+            int talepAdedi =
+                _rastgele.NextDouble() < EkTalepOlasiligi(musteri.MusteriTuru)
+                    ? 2
+                    : 1;
 
-            if (talep is not null)
+            for (int sira = 0; sira < talepAdedi; sira++)
             {
-                talepler.Add(
-                    talep);
+                HizmetTalebi? talep =
+                    MusteriIcinTalepOlustur(
+                        musteri,
+                        tickNumarasi);
+
+                if (talep is not null)
+                {
+                    talepler.Add(talep);
+                }
             }
         }
 
+        int kotuNiyetliSayisi =
+            talepler.Count(talep => talep.KotuNiyetli);
+
         KonsolKayitcisi.Bilgi(
             $"Tick {tickNumarasi} | " +
-            $"Talep oluşturan müşteri: " +
-            $"{talepSahipleri.Count} | " +
-            $"Geçerli talep: {talepler.Count}");
+            $"Talep oluşturan müşteri: {talepSahipleri.Count} | " +
+            $"Geçerli talep: {talepler.Count} | " +
+            $"Şüpheli iş: {kotuNiyetliSayisi}");
 
         return talepler;
     }
@@ -181,65 +154,72 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
         Musteri musteri,
         long tickNumarasi)
     {
-        ArgumentNullException.ThrowIfNull(
-            musteri);
-
+        ArgumentNullException.ThrowIfNull(musteri);
         BaslatilmisOlmasiniDogrula();
 
-        if (!MusteriTalepOlusturabilirMi(
-                musteri))
+        if (!MusteriTalepOlusturabilirMi(musteri))
         {
             return null;
         }
 
-        HizmetTanimi? hizmet =
-            HizmetSec(
-                musteri);
+        HizmetTanimi? hizmet = HizmetSec(musteri);
 
         if (hizmet is null)
         {
             return null;
         }
 
-        decimal azamiButce =
-            AzamiButceHesapla(
-                musteri);
+        decimal azamiButce = AzamiButceHesapla(musteri);
 
         if (azamiButce <= 0)
         {
             return null;
         }
 
+        int zorlukSeviyesi = ZorlukSeviyesiSec(hizmet.HizmetKimligi);
+        IstekSenaryosu senaryo =
+            IstekVerisiOlustur(hizmet, zorlukSeviyesi);
+        bool kotuNiyetli =
+            KotuNiyetliIsMi(tickNumarasi, zorlukSeviyesi);
+        string kotuNiyetTuru =
+            kotuNiyetli
+                ? KotuNiyetTuruSec(tickNumarasi)
+                : string.Empty;
+        string istekJson =
+            kotuNiyetli
+                ? GuvenlikSinamasiEkle(
+                    senaryo.Json,
+                    kotuNiyetTuru,
+                    zorlukSeviyesi)
+                : senaryo.Json;
+
+        decimal olasiGuvenlikKaybi =
+            kotuNiyetli
+                ? decimal.Round(
+                    Math.Clamp(
+                        azamiButce * 0.35m +
+                        zorlukSeviyesi * 25m,
+                        40m,
+                        2_500m),
+                    2)
+                : 0;
+
         return new HizmetTalebi
         {
-            IsKimligi =
-                YeniIsKimligi(
-                    tickNumarasi),
-
-            MusteriKimligi =
-                musteri.MusteriKimligi,
-
-            HizmetKimligi =
-                hizmet.HizmetKimligi,
-
-            HizmetSurumu =
-                hizmet.HizmetSurumu,
-
-            OlusturulmaTicki =
-                tickNumarasi,
-
-            AzamiButce =
-                azamiButce,
-
-            IstekVerisiJson =
-                IstekVerisiOlustur(
-                    hizmet),
-
-            Durum =
-                IsDurumu.Olusturuldu,
-
-            OlusturulmaZamani =
-                DateTimeOffset.UtcNow
+            IsKimligi = YeniIsKimligi(tickNumarasi),
+            MusteriKimligi = musteri.MusteriKimligi,
+            HizmetKimligi = hizmet.HizmetKimligi,
+            HizmetSurumu = hizmet.HizmetSurumu,
+            OlusturulmaTicki = tickNumarasi,
+            AzamiButce = azamiButce,
+            IstekVerisiJson = istekJson,
+            ZamanAsimiMs = hizmet.ZamanAsimiMs,
+            ZorlukSeviyesi = zorlukSeviyesi,
+            KotuNiyetli = kotuNiyetli,
+            KotuNiyetTuru = kotuNiyetTuru,
+            OlasiGuvenlikKaybi = olasiGuvenlikKaybi,
+            Durum = IsDurumu.Olusturuldu,
+            OlusturulmaZamani = DateTimeOffset.UtcNow
         };
     }
 
@@ -247,24 +227,14 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
         string musteriKimligi,
         decimal tutar)
     {
-        Musteri? musteri =
-            MusteriyiBul(
-                musteriKimligi);
+        Musteri? musteri = MusteriyiBul(musteriKimligi);
 
-        if (musteri is null)
+        if (musteri is null || !musteri.OdemeYapabilirMi(tutar))
         {
             return false;
         }
 
-        if (!musteri.OdemeYapabilirMi(
-                tutar))
-        {
-            return false;
-        }
-
-        musteri.OdemeYap(
-            tutar);
-
+        musteri.OdemeYap(tutar);
         return true;
     }
 
@@ -279,23 +249,12 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
                 "İade tutarı negatif olamaz.");
         }
 
-        Musteri? musteri =
-            MusteriyiBul(
-                musteriKimligi);
-
-        if (musteri is null)
-        {
-            throw new InvalidOperationException(
-                $"Müşteri bulunamadı: " +
-                $"{musteriKimligi}");
-        }
-
+        Musteri? musteri = MusteriyiBul(musteriKimligi)
+            ?? throw new InvalidOperationException(
+                $"Müşteri bulunamadı: {musteriKimligi}");
         musteri.Bakiye += tutar;
-
         musteri.ToplamHarcama =
-            Math.Max(
-                0,
-                musteri.ToplamHarcama - tutar);
+            Math.Max(0, musteri.ToplamHarcama - tutar);
     }
 
     public void IslemSonucunuKaydet(
@@ -305,67 +264,32 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
         double tamamlanmaSuresiMs,
         string sonucAciklamasi)
     {
-        ArgumentNullException.ThrowIfNull(
-            talep);
-
-        Musteri? musteri =
-            MusteriyiBul(
-                talep.MusteriKimligi);
-
-        if (musteri is null)
-        {
-            throw new InvalidOperationException(
-                $"İşlem müşterisi bulunamadı: " +
-                $"{talep.MusteriKimligi}");
-        }
+        ArgumentNullException.ThrowIfNull(talep);
+        Musteri? musteri = MusteriyiBul(talep.MusteriKimligi)
+            ?? throw new InvalidOperationException(
+                $"İşlem müşterisi bulunamadı: {talep.MusteriKimligi}");
 
         MusteriIslemKaydi islemKaydi =
             new()
             {
-                IsKimligi =
-                    talep.IsKimligi,
-
-                TickNumarasi =
-                    talep.OlusturulmaTicki,
-
-                HizmetKimligi =
-                    talep.HizmetKimligi,
-
-                HizmetSurumu =
-                    talep.HizmetSurumu,
-
-                SirketKimligi =
-                    talep.SecilenSirketKimligi ??
-                    string.Empty,
-
-                OdenenTutar =
-                    basarili
-                        ? odenenTutar
-                        : 0,
-
-                Basarili =
-                    basarili,
-
-                TamamlanmaSuresiMs =
-                    Math.Max(
-                        0,
-                        tamamlanmaSuresiMs),
-
-                OlusturulmaZamani =
-                    DateTimeOffset.UtcNow,
-
-                SonucAciklamasi =
-                    sonucAciklamasi?.Trim() ??
-                    string.Empty
+                IsKimligi = talep.IsKimligi,
+                TickNumarasi = talep.OlusturulmaTicki,
+                HizmetKimligi = talep.HizmetKimligi,
+                HizmetSurumu = talep.HizmetSurumu,
+                SirketKimligi = talep.SecilenSirketKimligi ?? string.Empty,
+                OdenenTutar = basarili ? odenenTutar : 0,
+                Basarili = basarili,
+                TamamlanmaSuresiMs = Math.Max(0, tamamlanmaSuresiMs),
+                OlusturulmaZamani = DateTimeOffset.UtcNow,
+                SonucAciklamasi = sonucAciklamasi?.Trim() ?? string.Empty
             };
 
-        musteri.IslemKaydet(
-            islemKaydi);
+        musteri.IslemKaydet(islemKaydi);
 
-        MusteriSadakatiniGuncelle(
-            musteri,
-            talep,
-            basarili);
+        if (!talep.KotuNiyetli)
+        {
+            MusteriSadakatiniGuncelle(musteri, talep, basarili);
+        }
     }
 
     public async Task GerekirseKaydetAsync(
@@ -373,39 +297,28 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
         CancellationToken cancellationToken)
     {
         BaslatilmisOlmasiniDogrula();
-
         const int kayitAraligiTick = 10;
 
-        if (tickNumarasi - _sonKayitTicki <
-            kayitAraligiTick)
+        if (tickNumarasi - _sonKayitTicki < kayitAraligiTick)
         {
             return;
         }
 
-        await KaydetAsync(
-            cancellationToken);
-
-        _sonKayitTicki =
-            tickNumarasi;
+        await KaydetAsync(cancellationToken);
+        _sonKayitTicki = tickNumarasi;
     }
 
     public async Task KaydetAsync(
         CancellationToken cancellationToken)
     {
         BaslatilmisOlmasiniDogrula();
-
-        await _kayitKilidi.WaitAsync(
-            cancellationToken);
+        await _kayitKilidi.WaitAsync(cancellationToken);
 
         try
         {
-            await _musteriVeritabani
-                .KaydetAsync(
-                    cancellationToken);
-
+            await _musteriVeritabani.KaydetAsync(cancellationToken);
             KonsolKayitcisi.Bilgi(
-                $"{Musteriler.Count} müşteri kaydı " +
-                $"disk üzerine yazıldı.");
+                $"{Musteriler.Count} müşteri kaydı disk üzerine yazıldı.");
         }
         finally
         {
@@ -413,105 +326,63 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
         }
     }
 
-    public void TickBasindaMusterileriGuncelle(
-        long tickNumarasi)
+    public void TickBasindaMusterileriGuncelle(long tickNumarasi)
     {
         BaslatilmisOlmasiniDogrula();
 
         foreach (Musteri musteri in Musteriler)
         {
-            if (!musteri.Aktif)
+            if (musteri.Aktif)
             {
-                continue;
+                MusteriGeliriEkle(musteri, tickNumarasi);
             }
-
-            MusteriGeliriEkle(
-                musteri,
-                tickNumarasi);
         }
     }
 
-    private HizmetTanimi? HizmetSec(
-        Musteri musteri)
+    private HizmetTanimi? HizmetSec(Musteri musteri)
     {
-        List<HizmetTanimi> aktifHizmetler =
-            _hizmetKatalogu.Hizmetler
-                .Where(
-                    hizmet => hizmet.Aktif)
-                .ToList();
-
-        if (aktifHizmetler.Count == 0)
-        {
-            return null;
-        }
-
-        List<(HizmetTanimi Hizmet, double Agirlik)>
-            agirlikliHizmetler = [];
+        List<(HizmetTanimi Hizmet, double Agirlik)> agirlikliHizmetler = [];
 
         foreach (HizmetTanimi hizmet in
-                 aktifHizmetler)
+                 _hizmetKatalogu.Hizmetler.Where(hizmet => hizmet.Aktif))
         {
-            musteri.HizmetKullanimSayilari
-                .TryGetValue(
-                    hizmet.HizmetKimligi,
-                    out int kullanimSayisi);
-
+            musteri.HizmetKullanimSayilari.TryGetValue(
+                hizmet.HizmetKimligi,
+                out int kullanimSayisi);
             double tekrarKullanimBonusu =
-                Math.Min(
-                    3.0,
-                    1.0 +
-                    kullanimSayisi * 0.10);
-
+                Math.Min(2.25, 1.0 + kullanimSayisi * 0.04);
             double hizmetAgirligi =
                 MusteriTuruneGoreHizmetAgirligi(
                     musteri.MusteriTuru,
                     hizmet.HizmetKimligi);
-
-            double sonAgirlik =
-                Math.Max(
-                    0.01,
-                    hizmetAgirligi *
-                    tekrarKullanimBonusu);
-
             agirlikliHizmetler.Add(
-                (hizmet, sonAgirlik));
+                (hizmet, Math.Max(0.01, hizmetAgirligi * tekrarKullanimBonusu)));
         }
 
-        return AgirlikliSecim(
-            agirlikliHizmetler);
+        return AgirlikliSecim(agirlikliHizmetler);
     }
 
     private HizmetTanimi? AgirlikliSecim(
-        IReadOnlyList<(
-            HizmetTanimi Hizmet,
-            double Agirlik)> hizmetler)
+        IReadOnlyList<(HizmetTanimi Hizmet, double Agirlik)> hizmetler)
     {
         if (hizmetler.Count == 0)
         {
             return null;
         }
 
-        double toplamAgirlik =
-            hizmetler.Sum(
-                oge => oge.Agirlik);
+        double toplamAgirlik = hizmetler.Sum(oge => oge.Agirlik);
 
         if (toplamAgirlik <= 0)
         {
-            return hizmetler[
-                _rastgele.Next(
-                    hizmetler.Count)].Hizmet;
+            return hizmetler[_rastgele.Next(hizmetler.Count)].Hizmet;
         }
 
-        double secim =
-            _rastgele.NextDouble() *
-            toplamAgirlik;
-
+        double secim = _rastgele.NextDouble() * toplamAgirlik;
         double birikenAgirlik = 0;
 
         foreach (var oge in hizmetler)
         {
-            birikenAgirlik +=
-                oge.Agirlik;
+            birikenAgirlik += oge.Agirlik;
 
             if (secim <= birikenAgirlik)
             {
@@ -522,13 +393,10 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
         return hizmetler[^1].Hizmet;
     }
 
-    private decimal AzamiButceHesapla(
-        Musteri musteri)
+    private decimal AzamiButceHesapla(Musteri musteri)
     {
         decimal tickButcesi =
-            Math.Min(
-                musteri.TickBasinaHarcamaButcesi,
-                musteri.Bakiye);
+            Math.Min(musteri.TickBasinaHarcamaButcesi, musteri.Bakiye);
 
         if (tickButcesi <= 0)
         {
@@ -536,183 +404,225 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
         }
 
         decimal butceCarpani =
-            (decimal)(
-                0.50 +
-                _rastgele.NextDouble() *
-                0.50);
-
-        decimal azamiButce =
-            tickButcesi *
-            butceCarpani;
-
+            (decimal)(0.55 + _rastgele.NextDouble() * 0.45);
         return decimal.Round(
-            Math.Max(
-                0.01m,
-                azamiButce),
+            Math.Max(0.01m, tickButcesi * butceCarpani),
             2);
     }
 
-    private string IstekVerisiOlustur(
-        HizmetTanimi hizmet)
+    private IstekSenaryosu IstekVerisiOlustur(
+        HizmetTanimi hizmet,
+        int zorluk)
     {
-        return hizmet.HizmetKimligi
-            .ToLowerInvariant() switch
+        string json =
+            hizmet.HizmetKimligi.ToLowerInvariant() switch
+            {
+                "matematik.topla" => MatematikToplaIstegiOlustur(zorluk),
+                "matematik.carp" => MatematikCarpIstegiOlustur(zorluk),
+                "veri.ortalama-hesapla" => OrtalamaIstegiOlustur(zorluk),
+                "metin.kelime-say" => KelimeSayIstegiOlustur(zorluk),
+                "metin.karakter-say" => KarakterSayIstegiOlustur(zorluk),
+                "veri.medyan-hesapla" => MedyanIstegiOlustur(zorluk),
+                "veri.standart-sapma" => StandartSapmaIstegiOlustur(zorluk),
+                "dizi.sirala" => SiralamaIstegiOlustur(zorluk),
+                "matematik.asal-carpanlar" => AsalCarpanIstegiOlustur(zorluk),
+                "metin.frekans-analizi" => FrekansAnaliziIstegiOlustur(zorluk),
+                _ => "{}"
+            };
+
+        return new IstekSenaryosu(json);
+    }
+
+    private string MatematikToplaIstegiOlustur(int zorluk)
+    {
+        int[] sayilar = RastgeleTamSayiDizisi(4 + zorluk * 8, -10_000, 10_001);
+        return JsonSerializer.Serialize(new { sayilar });
+    }
+
+    private string MatematikCarpIstegiOlustur(int zorluk)
+    {
+        int[] sayilar = RastgeleTamSayiDizisi(2 + zorluk, -9, 10);
+        return JsonSerializer.Serialize(new { sayilar });
+    }
+
+    private string OrtalamaIstegiOlustur(int zorluk)
+    {
+        double[] sayilar = RastgeleOndalikDizisi(8 + zorluk * 20);
+        return JsonSerializer.Serialize(new { sayilar });
+    }
+
+    private string KelimeSayIstegiOlustur(int zorluk)
+    {
+        return JsonSerializer.Serialize(
+            new { metin = RastgeleMetin(10 + zorluk * 35) });
+    }
+
+    private string KarakterSayIstegiOlustur(int zorluk)
+    {
+        string metin =
+            RastgeleMetin(8 + zorluk * 25) +
+            (zorluk >= 4 ? " teknoloji 🚀 güvenlik 🔐" : string.Empty);
+        return JsonSerializer.Serialize(new { metin });
+    }
+
+    private string MedyanIstegiOlustur(int zorluk)
+    {
+        int adet = 15 + zorluk * 45;
+        double[] sayilar = RastgeleOndalikDizisi(adet);
+        return JsonSerializer.Serialize(new { sayilar });
+    }
+
+    private string StandartSapmaIstegiOlustur(int zorluk)
+    {
+        int adet = 25 + zorluk * 70;
+        double[] sayilar = RastgeleOndalikDizisi(adet);
+        return JsonSerializer.Serialize(new { sayilar });
+    }
+
+    private string SiralamaIstegiOlustur(int zorluk)
+    {
+        int adet = 40 + zorluk * 160;
+        int[] sayilar = RastgeleTamSayiDizisi(adet, -1_000_000, 1_000_001);
+        string yon = _rastgele.Next(2) == 0 ? "artan" : "azalan";
+        return JsonSerializer.Serialize(new { sayilar, yon });
+    }
+
+    private string AsalCarpanIstegiOlustur(int zorluk)
+    {
+        int[] asalHavuzu =
+        [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 97, 193, 997, 5003, 10007];
+        long sayi = 1;
+        int carpanAdedi = 2 + zorluk;
+
+        for (int i = 0; i < carpanAdedi; i++)
         {
-            "matematik.topla" =>
-                MatematikToplaIstegiOlustur(),
+            int ustSinir = Math.Min(
+                asalHavuzu.Length,
+                6 + zorluk * 2);
+            int carpan = asalHavuzu[_rastgele.Next(ustSinir)];
 
-            "matematik.carp" =>
-                MatematikCarpIstegiOlustur(),
-
-            "veri.ortalama-hesapla" =>
-                OrtalamaIstegiOlustur(),
-
-            "metin.kelime-say" =>
-                KelimeSayIstegiOlustur(),
-
-            "metin.karakter-say" =>
-                KarakterSayIstegiOlustur(),
-
-            _ => "{}"
-        };
-    }
-
-    private string MatematikToplaIstegiOlustur()
-    {
-        int sayiAdedi =
-            _rastgele.Next(
-                2,
-                11);
-
-        int[] sayilar =
-            Enumerable.Range(
-                    0,
-                    sayiAdedi)
-                .Select(
-                    _ => _rastgele.Next(
-                        -1_000,
-                        1_001))
-                .ToArray();
-
-        return System.Text.Json.JsonSerializer.Serialize(
-            new
+            if (sayi > 2_000_000_000L / carpan)
             {
-                sayilar
-            });
+                break;
+            }
+
+            sayi *= carpan;
+        }
+
+        sayi = Math.Max(2, sayi);
+        return JsonSerializer.Serialize(new { sayi });
     }
 
-    private string MatematikCarpIstegiOlustur()
+    private string FrekansAnaliziIstegiOlustur(int zorluk)
     {
-        int sayiAdedi =
-            _rastgele.Next(
-                2,
-                6);
-
-        int[] sayilar =
-            Enumerable.Range(
-                    0,
-                    sayiAdedi)
-                .Select(
-                    _ => _rastgele.Next(
-                        1,
-                        11))
-                .ToArray();
-
-        return System.Text.Json.JsonSerializer.Serialize(
-            new
-            {
-                sayilar
-            });
+        return JsonSerializer.Serialize(
+            new { metin = RastgeleMetin(40 + zorluk * 180) });
     }
 
-    private string OrtalamaIstegiOlustur()
+    private int[] RastgeleTamSayiDizisi(
+        int adet,
+        int alt,
+        int ust)
     {
-        int sayiAdedi =
-            _rastgele.Next(
-                3,
-                16);
-
-        double[] sayilar =
-            Enumerable.Range(
-                    0,
-                    sayiAdedi)
-                .Select(
-                    _ =>
-                        Math.Round(
-                            _rastgele.NextDouble() *
-                            1_000,
-                            2))
-                .ToArray();
-
-        return System.Text.Json.JsonSerializer.Serialize(
-            new
-            {
-                sayilar
-            });
+        return Enumerable.Range(0, adet)
+            .Select(_ => _rastgele.Next(alt, ust))
+            .ToArray();
     }
 
-    private string KelimeSayIstegiOlustur()
+    private double[] RastgeleOndalikDizisi(int adet)
+    {
+        return Enumerable.Range(0, adet)
+            .Select(
+                _ => Math.Round(
+                    _rastgele.NextDouble() * 20_000 - 10_000,
+                    3))
+            .ToArray();
+    }
+
+    private string RastgeleMetin(int kelimeSayisi)
     {
         string[] kelimeler =
         [
-            "Tunix",
-            "motor",
-            "müşteri",
-            "şirket",
-            "hizmet",
-            "yazılım",
-            "sunucu",
-            "ekonomi",
-            "protokol",
-            "güvenlik",
-            "performans",
-            "kalite"
+            "tunix", "motor", "musteri", "sirket", "hizmet",
+            "yazilim", "sunucu", "ekonomi", "protokol", "guvenlik",
+            "performans", "kalite", "veri", "sistem", "ag",
+            "rekabet", "kapasite", "islem", "analiz", "teknoloji"
         ];
 
-        int kelimeSayisi =
-            _rastgele.Next(
-                3,
-                20);
-
-        string metin =
-            string.Join(
-                " ",
-                Enumerable.Range(
-                        0,
-                        kelimeSayisi)
-                    .Select(
-                        _ => kelimeler[
-                            _rastgele.Next(
-                                kelimeler.Length)]));
-
-        return System.Text.Json.JsonSerializer.Serialize(
-            new
-            {
-                metin
-            });
+        return string.Join(
+            " ",
+            Enumerable.Range(0, kelimeSayisi)
+                .Select(_ => kelimeler[_rastgele.Next(kelimeler.Length)]));
     }
 
-    private string KarakterSayIstegiOlustur()
+    private string GuvenlikSinamasiEkle(
+        string json,
+        string saldiriTuru,
+        int zorluk)
     {
-        string[] cumleler =
-        [
-            "İnsan için teknoloji.",
-            "Şirket motoru hizmetleri değerlendiriyor.",
-            "Müşteriler hızlı ve güvenilir hizmet istiyor.",
-            "Yazılım şirketleri piyasada rekabet ediyor.",
-            "Motor bütün ekonomik sonuçları takip ediyor."
-        ];
-
-        string metin =
-            cumleler[
-                _rastgele.Next(
-                    cumleler.Length)];
-
-        return System.Text.Json.JsonSerializer.Serialize(
-            new
+        JsonObject kok =
+            JsonNode.Parse(json) as JsonObject ?? new JsonObject();
+        kok["_guvenlikSinamasi"] =
+            new JsonObject
             {
-                metin
-            });
+                ["etiket"] = "motor-saldiri-v1",
+                ["tur"] = saldiriTuru,
+                ["yogunluk"] = zorluk,
+                ["sahteYetki"] = "yonetici",
+                ["komut"] = "kaynaklari-tuket"
+            };
+        kok["_saldiriDolgusu"] =
+            new string('X', 500 + zorluk * 1_500);
+        return kok.ToJsonString();
+    }
+
+    private int ZorlukSeviyesiSec(string hizmetKimligi)
+    {
+        bool ileriHizmet =
+            hizmetKimligi is
+                "veri.medyan-hesapla" or
+                "veri.standart-sapma" or
+                "dizi.sirala" or
+                "matematik.asal-carpanlar" or
+                "metin.frekans-analizi";
+
+        int taban = ileriHizmet ? 2 : 1;
+        int ust = ileriHizmet ? 6 : 5;
+        int zorluk = _rastgele.Next(taban, ust);
+
+        if (_rastgele.NextDouble() < 0.08)
+        {
+            zorluk = 5;
+        }
+
+        return Math.Clamp(zorluk, 1, 5);
+    }
+
+    private bool KotuNiyetliIsMi(
+        long tickNumarasi,
+        int zorluk)
+    {
+        int dongu = (int)(Math.Abs(tickNumarasi) % 120);
+        bool saldiriDalgasi =
+            dongu is >= 58 and < 74 or >= 104 and < 113;
+        double olasilik =
+            saldiriDalgasi
+                ? 0.10 + zorluk * 0.015
+                : 0.008 + zorluk * 0.002;
+        return _rastgele.NextDouble() < olasilik;
+    }
+
+    private string KotuNiyetTuruSec(long tickNumarasi)
+    {
+        string[] turler =
+        [
+            "kaynak-tuketimi",
+            "buyuk-payload",
+            "yetki-yukseltme-denemesi",
+            "komut-enjeksiyonu",
+            "tekrar-saldirisi"
+        ];
+        return turler[(int)(Math.Abs(tickNumarasi) % turler.Length)];
     }
 
     private void MusteriGeliriEkle(
@@ -722,14 +632,13 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
         int gelirAraligi =
             musteri.MusteriTuru switch
             {
-                MusteriTuru.Bireysel => 50,
-                MusteriTuru.KucukIsletme => 250,
-                MusteriTuru.OrtaOlcekliIsletme => 1_000,
-                MusteriTuru.Kurumsal => 5_000,
-                MusteriTuru.KamuKurumu => 10_000,
-                _ => 50
+                MusteriTuru.Bireysel => 75,
+                MusteriTuru.KucukIsletme => 400,
+                MusteriTuru.OrtaOlcekliIsletme => 1_500,
+                MusteriTuru.Kurumsal => 7_500,
+                MusteriTuru.KamuKurumu => 15_000,
+                _ => 75
             };
-
         int gelirPeriyodu =
             musteri.MusteriTuru switch
             {
@@ -741,115 +650,92 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
                 _ => 20
             };
 
-        if (tickNumarasi <= 0 ||
-            tickNumarasi % gelirPeriyodu != 0)
+        if (tickNumarasi <= 0 || tickNumarasi % gelirPeriyodu != 0)
         {
             return;
         }
 
-        decimal gelir =
+        musteri.Bakiye +=
             _rastgele.Next(
-                Math.Max(
-                    1,
-                    gelirAraligi / 2),
+                Math.Max(1, gelirAraligi / 2),
                 gelirAraligi + 1);
-
-        musteri.Bakiye += gelir;
     }
 
-    private static bool MusteriTalepOlusturabilirMi(
-        Musteri musteri)
+    private static bool MusteriTalepOlusturabilirMi(Musteri musteri)
     {
-        return
-            musteri.Aktif &&
-            musteri.Bakiye > 0 &&
-            musteri.TickBasinaHarcamaButcesi > 0 &&
-            musteri.TalepOlusturmaOlasiligi > 0;
+        return musteri.Aktif &&
+               musteri.Bakiye > 0 &&
+               musteri.TickBasinaHarcamaButcesi > 0 &&
+               musteri.TalepOlusturmaOlasiligi > 0;
     }
 
-    private static double TickTalepCarpaniHesapla(
-        long tickNumarasi)
+    private static double TickTalepCarpaniHesapla(long tickNumarasi)
     {
         if (tickNumarasi <= 0)
         {
             return 1;
         }
 
-        int pazarDongusu =
-            (int)(tickNumarasi % 100);
+        int pazarDongusu = (int)(tickNumarasi % 120);
 
         return pazarDongusu switch
         {
-            < 20 => 0.80,
-            < 40 => 1.00,
-            < 60 => 1.20,
-            < 80 => 1.05,
-            _ => 0.90
+            < 20 => 0.90,
+            < 40 => 1.20,
+            < 58 => 1.50,
+            < 74 => 1.80,
+            < 94 => 1.25,
+            < 104 => 1.05,
+            < 113 => 1.55,
+            _ => 0.85
         };
     }
 
-    private static double
-        MusteriTuruneGoreHizmetAgirligi(
-            MusteriTuru musteriTuru,
-            string hizmetKimligi)
+    private static double EkTalepOlasiligi(MusteriTuru tur)
     {
-        bool matematikHizmeti =
-            hizmetKimligi.StartsWith(
-                "matematik.",
-                StringComparison.OrdinalIgnoreCase);
+        return tur switch
+        {
+            MusteriTuru.Bireysel => 0.03,
+            MusteriTuru.KucukIsletme => 0.10,
+            MusteriTuru.OrtaOlcekliIsletme => 0.18,
+            MusteriTuru.Kurumsal => 0.30,
+            MusteriTuru.KamuKurumu => 0.22,
+            _ => 0.05
+        };
+    }
 
-        bool metinHizmeti =
-            hizmetKimligi.StartsWith(
-                "metin.",
-                StringComparison.OrdinalIgnoreCase);
-
-        bool veriHizmeti =
-            hizmetKimligi.StartsWith(
-                "veri.",
-                StringComparison.OrdinalIgnoreCase);
+    private static double MusteriTuruneGoreHizmetAgirligi(
+        MusteriTuru musteriTuru,
+        string hizmetKimligi)
+    {
+        bool matematik = hizmetKimligi.StartsWith(
+            "matematik.",
+            StringComparison.OrdinalIgnoreCase);
+        bool metin = hizmetKimligi.StartsWith(
+            "metin.",
+            StringComparison.OrdinalIgnoreCase);
+        bool veri = hizmetKimligi.StartsWith(
+            "veri.",
+            StringComparison.OrdinalIgnoreCase);
+        bool dizi = hizmetKimligi.StartsWith(
+            "dizi.",
+            StringComparison.OrdinalIgnoreCase);
 
         return musteriTuru switch
         {
-            MusteriTuru.Bireysel
-                when metinHizmeti =>
-                1.50,
-
-            MusteriTuru.Bireysel
-                when matematikHizmeti =>
-                1.10,
-
-            MusteriTuru.KucukIsletme
-                when matematikHizmeti =>
-                1.40,
-
-            MusteriTuru.KucukIsletme
-                when metinHizmeti =>
-                1.25,
-
-            MusteriTuru.OrtaOlcekliIsletme
-                when veriHizmeti =>
-                1.60,
-
-            MusteriTuru.OrtaOlcekliIsletme
-                when matematikHizmeti =>
-                1.30,
-
-            MusteriTuru.Kurumsal
-                when veriHizmeti =>
-                2.00,
-
-            MusteriTuru.Kurumsal
-                when metinHizmeti =>
-                1.20,
-
-            MusteriTuru.KamuKurumu
-                when veriHizmeti =>
-                1.80,
-
-            MusteriTuru.KamuKurumu
-                when matematikHizmeti =>
-                1.30,
-
+            MusteriTuru.Bireysel when metin => 1.45,
+            MusteriTuru.Bireysel when matematik => 1.05,
+            MusteriTuru.KucukIsletme when matematik => 1.30,
+            MusteriTuru.KucukIsletme when metin => 1.25,
+            MusteriTuru.KucukIsletme when dizi => 1.15,
+            MusteriTuru.OrtaOlcekliIsletme when veri => 1.75,
+            MusteriTuru.OrtaOlcekliIsletme when dizi => 1.55,
+            MusteriTuru.Kurumsal when veri => 2.20,
+            MusteriTuru.Kurumsal when dizi => 1.90,
+            MusteriTuru.Kurumsal when metin => 1.25,
+            MusteriTuru.KamuKurumu when veri => 2.00,
+            MusteriTuru.KamuKurumu when matematik => 1.35,
+            MusteriTuru.KamuKurumu when dizi => 1.60,
             _ => 1.00
         };
     }
@@ -859,8 +745,7 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
         HizmetTalebi talep,
         bool basarili)
     {
-        if (string.IsNullOrWhiteSpace(
-                talep.SecilenSirketKimligi))
+        if (string.IsNullOrWhiteSpace(talep.SecilenSirketKimligi))
         {
             return;
         }
@@ -875,8 +760,7 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
                      talep.SecilenSirketKimligi,
                      StringComparison.OrdinalIgnoreCase))
         {
-            musteri.TercihEdilenSirketKimligi =
-                null;
+            musteri.TercihEdilenSirketKimligi = null;
         }
     }
 
@@ -891,8 +775,7 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
                     musteri))
             {
                 throw new InvalidOperationException(
-                    $"Tekrarlanan müşteri kimliği: " +
-                    $"{musteri.MusteriKimligi}");
+                    $"Tekrarlanan müşteri kimliği: {musteri.MusteriKimligi}");
             }
         }
     }
@@ -907,48 +790,29 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
 
         foreach (Musteri musteri in Musteriler)
         {
-            if (string.IsNullOrWhiteSpace(
-                    musteri.MusteriKimligi))
+            if (string.IsNullOrWhiteSpace(musteri.MusteriKimligi))
             {
                 throw new InvalidOperationException(
                     "Müşteri kimliği boş olamaz.");
             }
 
-            musteri.Bakiye =
-                Math.Max(
-                    0,
-                    musteri.Bakiye);
-
+            musteri.Bakiye = Math.Max(0, musteri.Bakiye);
             musteri.TickBasinaHarcamaButcesi =
-                Math.Max(
-                    0,
-                    musteri.TickBasinaHarcamaButcesi);
-
+                Math.Max(0, musteri.TickBasinaHarcamaButcesi);
             musteri.TalepOlusturmaOlasiligi =
-                Math.Clamp(
-                    musteri.TalepOlusturmaOlasiligi,
-                    0,
-                    1);
-
-            musteri.Tercihler ??=
-                new MusteriTercihleri();
-
+                Math.Clamp(musteri.TalepOlusturmaOlasiligi, 0, 1);
+            musteri.Tercihler ??= new MusteriTercihleri();
             musteri.Tercihler.NormalizeEt();
-
             musteri.HizmetKullanimSayilari ??=
                 new Dictionary<string, int>(
                     StringComparer.OrdinalIgnoreCase);
-
             musteri.IslemGecmisi ??= [];
         }
     }
 
-    private static string YeniIsKimligi(
-        long tickNumarasi)
+    private static string YeniIsKimligi(long tickNumarasi)
     {
-        return
-            $"is-{tickNumarasi:D8}-" +
-            $"{Guid.NewGuid():N}";
+        return $"is-{tickNumarasi:D8}-{Guid.NewGuid():N}";
     }
 
     private void BaslatilmisOlmasiniDogrula()
@@ -966,18 +830,18 @@ public sealed class MusteriYoneticisi : IAsyncDisposable
         {
             try
             {
-                await KaydetAsync(
-                    CancellationToken.None);
+                await KaydetAsync(CancellationToken.None);
             }
             catch (Exception exception)
             {
                 KonsolKayitcisi.Uyari(
-                    $"Müşteri verileri kapatılırken " +
-                    $"kaydedilemedi: " +
-                    $"{exception.Message}");
+                    $"Müşteri verileri kapatılırken kaydedilemedi: " +
+                    exception.Message);
             }
         }
 
         _kayitKilidi.Dispose();
     }
+
+    private sealed record IstekSenaryosu(string Json);
 }
