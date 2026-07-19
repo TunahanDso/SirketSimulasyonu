@@ -1,9 +1,10 @@
-﻿# C#
+# C#
 bin/
 obj/
 
 # Rust
 target/
+Sirketler/Tunahan-Rustix/Tunix/Cargo.lock
 
 # Node
 node_modules/
