@@ -22,6 +22,7 @@
 
     <Compile Remove="Isletim/SirketYonetimSunucusu.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusuV2.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusuV3.cs" />
     <Compile Remove="Isletim/SirketIsletimYoneticisi.cs" />
     <Compile Remove="Isletim/KodTabanliSirketIsletimYoneticisi.cs" />
 
