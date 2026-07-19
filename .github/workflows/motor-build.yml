@@ -1,0 +1,40 @@
+name: Motor Build
+
+on:
+  push:
+    branches:
+      - agent/tunix-matematik-topla
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  motor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build motor
+        run: dotnet build SirketMotoru/SirketMotoru.csproj --configuration Release
+
+  tunix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test Tunix
+        working-directory: Sirketler/Tunahan-Rustix/Tunix
+        run: cargo test --all-targets
+
+  ilos-tech:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test Ilos Tech
+        working-directory: Sirketler/Ilayda-Python/IlosTech
+        run: python -m unittest -v
