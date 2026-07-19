@@ -259,6 +259,11 @@ fn is_istegini_isle(
 
     if kotu_niyetli_istek_mi(&istek.istek_verisi_json) {
         let islem_suresi_ms = baslangic.elapsed().as_secs_f64() * 1_000.0;
+        eprintln!(
+            "GÜVENLİK REDDİ | İş: {} | Hizmet: {}@{} | Süre: {:.3} ms",
+            istek.is_kimligi, istek.hizmet_kimligi, istek.hizmet_surumu, islem_suresi_ms
+        );
+
         let sonuc_mesaji = IsSonucuMesaji {
             mesaj_turu: "isSonucu",
             istek_kimligi: istek.istek_kimligi,
@@ -274,10 +279,6 @@ fn is_istegini_isle(
             islem_suresi_ms,
         };
 
-        eprintln!(
-            "GÜVENLİK REDDİ | İş: {} | Hizmet: {}@{} | Süre: {:.3} ms",
-            istek.is_kimligi, istek.hizmet_kimligi, istek.hizmet_surumu, islem_suresi_ms
-        );
         return mesaj_gonder(yazici, &sonuc_mesaji);
     }
 
