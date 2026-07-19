@@ -17,6 +17,7 @@ public sealed class TickYoneticisi
     private readonly MusteriIsletimSistemiYoneticisi _musteriIsletimSistemiYoneticisi;
     private readonly KodTabanliSirketIsletimYoneticisi _isletimYoneticisi;
     private readonly EkosistemYoneticisi _ekosistemYoneticisi;
+    private readonly PazarFiyatYoneticisi _pazarFiyatYoneticisi;
     private readonly IsYoneticisi _isYoneticisi;
     private long _tickNumarasi;
     private bool _calisiyor;
@@ -30,7 +31,8 @@ public sealed class TickYoneticisi
         MusteriYoneticisi musteriYoneticisi,
         MusteriIsletimSistemiYoneticisi musteriIsletimSistemiYoneticisi,
         KodTabanliSirketIsletimYoneticisi isletimYoneticisi,
-        EkosistemYoneticisi ekosistemYoneticisi)
+        EkosistemYoneticisi ekosistemYoneticisi,
+        PazarFiyatYoneticisi pazarFiyatYoneticisi)
     {
         ArgumentNullException.ThrowIfNull(ayarlar);
         ArgumentNullException.ThrowIfNull(sirketYoneticisi);
@@ -38,6 +40,7 @@ public sealed class TickYoneticisi
         ArgumentNullException.ThrowIfNull(musteriIsletimSistemiYoneticisi);
         ArgumentNullException.ThrowIfNull(isletimYoneticisi);
         ArgumentNullException.ThrowIfNull(ekosistemYoneticisi);
+        ArgumentNullException.ThrowIfNull(pazarFiyatYoneticisi);
         if (ayarlar.TickSuresiSaniye <= 0) throw new ArgumentOutOfRangeException(nameof(ayarlar));
         _ayarlar = ayarlar;
         _sirketYoneticisi = sirketYoneticisi;
@@ -45,6 +48,7 @@ public sealed class TickYoneticisi
         _musteriIsletimSistemiYoneticisi = musteriIsletimSistemiYoneticisi;
         _isletimYoneticisi = isletimYoneticisi;
         _ekosistemYoneticisi = ekosistemYoneticisi;
+        _pazarFiyatYoneticisi = pazarFiyatYoneticisi;
         _isYoneticisi = new IsYoneticisi(sirketYoneticisi, musteriYoneticisi, new SonucDogrulayicisi());
     }
 
@@ -90,15 +94,16 @@ public sealed class TickYoneticisi
     private async Task TickCalistirAsync(long tickNumarasi, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
         _musteriYoneticisi.TickBasindaMusterileriGuncelle(tickNumarasi);
         await _sirketYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
 
-        // Ürün/işletim sistemi/protokol uyumu ve altyapı sınırları normal ekonomiden önce uygulanır.
         await _ekosistemYoneticisi.PazariHazirlaAsync(tickNumarasi, cancellationToken);
         _musteriIsletimSistemiYoneticisi.TickCalistir(tickNumarasi);
 
+        // Temel ürün ekonomisi çalışır; hemen ardından kategori fiyat pazarı aşırı fiyatlı
+        // edinimleri iptal eder, mevcut kullanıcı kaçışını ve rakibe göçü uygular.
         await _isletimYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
+        await _pazarFiyatYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
 
         IReadOnlyList<HizmetTalebi> talepler = _musteriYoneticisi.TickTalepleriniOlustur(tickNumarasi);
         CanliPanoDurumDeposu.TalepleriGuncelle(tickNumarasi, talepler);
@@ -123,11 +128,15 @@ public sealed class TickYoneticisi
     private void TickOzetiniYaz(long tickNumarasi, IReadOnlyList<HizmetTalebi> talepler)
     {
         IReadOnlyList<IsletimSistemiPazarKaydi> sistemler = IsletimSistemiPazarDeposu.Getir();
+        PazarFiyatDosyasi fiyatPazari = PazarFiyatDeposu.Getir();
         int osKullanan = sistemler.Sum(x => x.AktifMusteriSayisi);
         int osBekleyen = Math.Max(0, _musteriYoneticisi.AktifMusteriSayisi - osKullanan);
+        int fiyatKaybi = fiyatPazari.Urunler.Sum(x => x.BuTickFiyatKaybi + x.BuTickEngellenenYeniKullanici);
+        int rakibeGoc = fiyatPazari.Urunler.Sum(x => x.BuTickRakiptenGelenKullanici);
         KonsolKayitcisi.Bilgi(
             $"Tick {tickNumarasi} özeti | Aktif müşteri: {_musteriYoneticisi.AktifMusteriSayisi} | " +
             $"OS kullanan: {osKullanan} | OS bekleyen: {osBekleyen} | Aktif OS: {sistemler.Count} | " +
+            $"Fiyat nedeniyle reddedilen/kaçan: {fiyatKaybi} | Rakibe göç: {rakibeGoc} | " +
             $"Yeni talep: {talepler.Count} | Talep bütçesi: {talepler.Sum(t => t.AzamiButce):N2} | " +
             $"Müşteri bakiyesi: {_musteriYoneticisi.ToplamMusteriBakiyesi:N2} | " +
             $"Şirket kasaları: {_sirketYoneticisi.SirketKayitlari.Sum(s => s.Kasa):N2}");
