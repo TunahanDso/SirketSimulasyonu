@@ -1,6 +1,7 @@
 name: Motor Build
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - agent/tunix-matematik-topla
