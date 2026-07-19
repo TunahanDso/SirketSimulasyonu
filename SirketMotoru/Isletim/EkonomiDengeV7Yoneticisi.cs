@@ -71,13 +71,19 @@ public sealed class EkonomiDengeV7Yoneticisi
                 decimal odenmisArtis = Math.Max(0, durum.ToplamIsletmeGideri - onceki.OdenmisGider);
                 decimal odenemeyenArtis = Math.Max(0, durum.OdenemeyenGider - onceki.OdenemeyenGider);
                 decimal toplamYukumluluk = odenmisArtis + odenemeyenArtis;
-                decimal hedef = SurdurulebilirTickGideri(sirket, durum);
-                if (toplamYukumluluk <= hedef * 1.10m) continue;
 
-                decimal toplamDuzeltme = decimal.Round(toplamYukumluluk - hedef, 2);
+                // Yalnız eski formülün hizmet/kapasite/ürün ölçeklemesinden doğan
+                // yapay fark düzeltilir. Yatırım bakım gideri, aktif piyasa olayı,
+                // SLA cezası, güvenlik kaybı ve diğer gerçek olaylar bu hesaba
+                // dahil edilmez ve bu nedenle iade edilmez.
+                decimal eskiYapayTaban = EskiYapaySabitMaliyet(sirket, durum);
+                decimal v7Karsiligi = V7SabitMaliyetKarsiligi(sirket, durum);
+                decimal azamiDuzeltme = Math.Max(0, eskiYapayTaban - v7Karsiligi);
+                decimal toplamDuzeltme = decimal.Round(Math.Min(toplamYukumluluk, azamiDuzeltme), 2);
+                if (toplamDuzeltme <= 0) continue;
 
-                // Önce henüz ödenmemiş ve yalnız eski aşırı ölçek formülünden doğan
-                // yükümlülük silinir; kalan düzeltme gerçekten kasadan çıkmışsa iade edilir.
+                // Önce henüz ödenmemiş yapay yükümlülük silinir; kalan düzeltme
+                // gerçekten kasadan çıktıysa nakit olarak geri verilir.
                 decimal odenemeyenDuzeltme = Math.Min(odenemeyenArtis, toplamDuzeltme);
                 durum.OdenemeyenGider = Math.Max(
                     onceki.OdenemeyenGider,
@@ -99,7 +105,7 @@ public sealed class EkonomiDengeV7Yoneticisi
                     IslemKimligi = $"v7-gider-dengeleme-{Guid.NewGuid():N}",
                     TickNumarasi = tickNumarasi,
                     IslemTuru = "operasyon-maliyet-normalizasyonu",
-                    Aciklama = $"Eski ölçek formülünün {toplamDuzeltme:N2} TL aşırı sabit maliyeti V7 fiziksel kaynak modeline göre kaldırıldı. Ödenemeyen düzeltme: {odenemeyenDuzeltme:N2} TL; nakit iadesi: {nakitDuzeltmesi:N2} TL. Gerçek yatırım, kullanıcı, finansman, ceza ve piyasa giderleri korunur.",
+                    Aciklama = $"Eski hizmet/kapasite sabit maliyetinin {toplamDuzeltme:N2} TL yapay kısmı V7 fiziksel kaynak modeline göre kaldırıldı. Ödenemeyen düzeltme: {odenemeyenDuzeltme:N2} TL; nakit iadesi: {nakitDuzeltmesi:N2} TL. Yatırım bakımı, olaylar, ceza ve finansman giderleri korunur.",
                     Tutar = 0
                 });
                 if (durum.SonIslemler.Count > 200)
@@ -107,21 +113,52 @@ public sealed class EkonomiDengeV7Yoneticisi
 
                 KonsolKayitcisi.Bilgi(
                     $"V7 GİDER DENGESİ | {sirket.SirketAdi} | " +
-                    $"Eski yükümlülük: {toplamYukumluluk:N2} | Etkin gider: {hedef:N2} | " +
-                    $"Ödenemeyen silindi: {odenemeyenDuzeltme:N2} | Nakit iadesi: {nakitDuzeltmesi:N2}");
+                    $"Eski yapay taban: {eskiYapayTaban:N2} | V7 karşılığı: {v7Karsiligi:N2} | " +
+                    $"Düzeltme: {toplamDuzeltme:N2} | Ödenemeyen silindi: {odenemeyenDuzeltme:N2} | " +
+                    $"Nakit iadesi: {nakitDuzeltmesi:N2}");
             }
             await KaydetAsync(cancellationToken);
         }
         finally { kilit.Release(); }
     }
 
-    private static decimal SurdurulebilirTickGideri(SirketKaydi sirket, SirketIsletimDurumu durum)
+    private static decimal EskiYapaySabitMaliyet(SirketKaydi sirket, SirketIsletimDurumu durum)
+    {
+        int hizmet = sirket.Hizmetler.Count(h => h.Aktif);
+        int kapasite = sirket.Hizmetler.Where(h => h.Aktif).Sum(h => h.AzamiEszamanliIs);
+        int urun = durum.Urunler.Count(u => u.Aktif);
+        int kullanici = durum.Urunler.Where(u => u.Aktif).Sum(u => u.AktifKullaniciSayisi);
+
+        decimal tutar =
+            420m +
+            hizmet * 42m +
+            kapasite * 10m +
+            urun * 180m +
+            kullanici * 0.48m +
+            (decimal)Math.Max(0, durum.TeknikBorc) * 14m +
+            (decimal)Math.Max(0, durum.BakimBaskisi) * 8m;
+
+        foreach (UrunKaydi u in durum.Urunler.Where(u => u.Aktif))
+        {
+            tutar += u.UrunTuru switch
+            {
+                "isletim-sistemi" => 480m,
+                "platform" => 390m,
+                "altyapi" => 310m,
+                _ => 120m
+            };
+            tutar += u.Bagimliliklar.Count * 28m + u.DesteklenenPlatformlar.Count * 12m;
+        }
+
+        return decimal.Round(Math.Max(0, tutar), 2);
+    }
+
+    private static decimal V7SabitMaliyetKarsiligi(SirketKaydi sirket, SirketIsletimDurumu durum)
     {
         int aktifHizmet = sirket.Hizmetler.Count(h => h.Aktif);
         int hizmetKapasitesi = sirket.Hizmetler.Where(h => h.Aktif).Sum(h => h.AzamiEszamanliIs);
         int aktifUrun = durum.Urunler.Count(u => u.Aktif);
         int kullanici = durum.Urunler.Where(u => u.Aktif).Sum(u => u.AktifKullaniciSayisi);
-        int yatirimSeviyesi = durum.YatirimSeviyeleri.Values.Sum();
 
         decimal gider =
             35m +
@@ -129,7 +166,6 @@ public sealed class EkonomiDengeV7Yoneticisi
             hizmetKapasitesi * 0.035m +
             aktifUrun * 18m +
             kullanici * 0.008m +
-            yatirimSeviyesi * 4m +
             (decimal)Math.Max(0, durum.TeknikBorc) * 0.45m +
             (decimal)Math.Max(0, durum.BakimBaskisi) * 0.40m;
 
