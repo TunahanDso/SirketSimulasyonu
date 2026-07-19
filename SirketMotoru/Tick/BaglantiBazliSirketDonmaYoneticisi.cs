@@ -7,7 +7,7 @@ namespace SirketMotoru.Tick;
 
 /// <summary>
 /// Sunucusu kapalı olan şirketin hizmet ve uygulama tanımlarına dokunmadan
-/// bilanço, puan, kredi, yatırım ve ürün piyasa durumunu tick boyunca dondurur.
+/// bilanço, puan, kredi, yatırım, ürün ve finans defterini tick boyunca dondurur.
 /// Global tick ve bağlı şirketler normal biçimde çalışmaya devam eder.
 /// </summary>
 public sealed class BaglantiBazliSirketDonmaYoneticisi
@@ -48,15 +48,24 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
     private readonly FieldInfo _veriAlani;
     private readonly FieldInfo _kilitAlani;
     private readonly MethodInfo _kaydetMetodu;
+
+    private readonly FinansV7Yoneticisi _finans;
+    private readonly FieldInfo _finansDosyaAlani;
+    private readonly FieldInfo _finansKilitAlani;
+    private readonly MethodInfo _finansKaydetMetodu;
+
     private readonly Dictionary<string, SirketAnlik> _sirketAnliklari = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SirketIsletimDurumu> _isletimAnliklari = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, FinansV7SirketKaydi?> _finansAnliklari = new(StringComparer.OrdinalIgnoreCase);
 
     public BaglantiBazliSirketDonmaYoneticisi(
         SirketYoneticisi sirketler,
-        KodTabanliSirketIsletimYoneticisi isletim)
+        KodTabanliSirketIsletimYoneticisi isletim,
+        FinansV7Yoneticisi finans)
     {
         _sirketler = sirketler ?? throw new ArgumentNullException(nameof(sirketler));
         ArgumentNullException.ThrowIfNull(isletim);
+        _finans = finans ?? throw new ArgumentNullException(nameof(finans));
 
         FieldInfo temelAlani = typeof(KodTabanliSirketIsletimYoneticisi)
             .GetField("_temel", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -70,18 +79,46 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
             ?? throw new InvalidOperationException("İşletim kilidi bulunamadı.");
         _kaydetMetodu = tur.GetMethod("TumunuKaydetAsync", BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("İşletim kayıt metodu bulunamadı.");
+
+        Type finansTur = typeof(FinansV7Yoneticisi);
+        _finansDosyaAlani = finansTur.GetField("_dosya", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Finans dosya alanı bulunamadı.");
+        _finansKilitAlani = finansTur.GetField("_kilit", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Finans kilidi bulunamadı.");
+        _finansKaydetMetodu = finansTur.GetMethod("KaydetAsync", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Finans kayıt metodu bulunamadı.");
     }
 
     public async Task TickOncesiAsync(CancellationToken cancellationToken)
     {
         _sirketAnliklari.Clear();
         _isletimAnliklari.Clear();
+        _finansAnliklari.Clear();
 
         foreach (SirketKaydi sirket in _sirketler.SirketKayitlari.Where(x => !x.BagliMi))
             _sirketAnliklari[sirket.SirketKimligi] = Al(sirket);
 
         if (_sirketAnliklari.Count == 0) return;
+        await IsletimAnliklariniAlAsync(cancellationToken);
+        await FinansAnliklariniAlAsync(cancellationToken);
+    }
 
+    public async Task GeriYukleAsync(long tickNumarasi, CancellationToken cancellationToken)
+    {
+        if (_sirketAnliklari.Count == 0) return;
+
+        await IsletimiGeriYukleAsync(cancellationToken);
+        foreach ((string kimlik, SirketAnlik anlik) in _sirketAnliklari)
+        {
+            SirketKaydi? sirket = _sirketler.SirketKayitlari.FirstOrDefault(x =>
+                x.SirketKimligi.Equals(kimlik, StringComparison.OrdinalIgnoreCase));
+            if (sirket is not null) Uygula(sirket, anlik);
+        }
+        await FinansiGeriYukleAsync(tickNumarasi, cancellationToken);
+    }
+
+    private async Task IsletimAnliklariniAlAsync(CancellationToken cancellationToken)
+    {
         SemaphoreSlim kilit = (SemaphoreSlim)(_kilitAlani.GetValue(_temel)
             ?? throw new InvalidOperationException("İşletim kilidi boş."));
         await kilit.WaitAsync(cancellationToken);
@@ -96,10 +133,27 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
         finally { kilit.Release(); }
     }
 
-    public async Task GeriYukleAsync(CancellationToken cancellationToken)
+    private async Task FinansAnliklariniAlAsync(CancellationToken cancellationToken)
     {
-        if (_sirketAnliklari.Count == 0) return;
+        SemaphoreSlim kilit = (SemaphoreSlim)(_finansKilitAlani.GetValue(_finans)
+            ?? throw new InvalidOperationException("Finans kilidi boş."));
+        await kilit.WaitAsync(cancellationToken);
+        try
+        {
+            FinansV7Dosyasi dosya = (FinansV7Dosyasi)(_finansDosyaAlani.GetValue(_finans)
+                ?? throw new InvalidOperationException("Finans dosyası boş."));
+            foreach (string kimlik in _sirketAnliklari.Keys)
+            {
+                FinansV7SirketKaydi? kayit = dosya.Sirketler.FirstOrDefault(x =>
+                    x.SirketKimligi.Equals(kimlik, StringComparison.OrdinalIgnoreCase));
+                _finansAnliklari[kimlik] = kayit is null ? null : Kopyala(kayit);
+            }
+        }
+        finally { kilit.Release(); }
+    }
 
+    private async Task IsletimiGeriYukleAsync(CancellationToken cancellationToken)
+    {
         SemaphoreSlim kilit = (SemaphoreSlim)(_kilitAlani.GetValue(_temel)
             ?? throw new InvalidOperationException("İşletim kilidi boş."));
         await kilit.WaitAsync(cancellationToken);
@@ -107,7 +161,6 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
         {
             SirketIsletimDosyasi veri = (SirketIsletimDosyasi)(_veriAlani.GetValue(_temel)
                 ?? throw new InvalidOperationException("İşletim verisi boş."));
-
             foreach ((string kimlik, SirketIsletimDurumu anlik) in _isletimAnliklari)
             {
                 int sira = veri.Sirketler.FindIndex(x =>
@@ -121,13 +174,33 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
             await kayit;
         }
         finally { kilit.Release(); }
+    }
 
-        foreach ((string kimlik, SirketAnlik anlik) in _sirketAnliklari)
+    private async Task FinansiGeriYukleAsync(long tickNumarasi, CancellationToken cancellationToken)
+    {
+        SemaphoreSlim kilit = (SemaphoreSlim)(_finansKilitAlani.GetValue(_finans)
+            ?? throw new InvalidOperationException("Finans kilidi boş."));
+        await kilit.WaitAsync(cancellationToken);
+        try
         {
-            SirketKaydi? sirket = _sirketler.SirketKayitlari.FirstOrDefault(x =>
-                x.SirketKimligi.Equals(kimlik, StringComparison.OrdinalIgnoreCase));
-            if (sirket is not null) Uygula(sirket, anlik);
+            FinansV7Dosyasi dosya = (FinansV7Dosyasi)(_finansDosyaAlani.GetValue(_finans)
+                ?? throw new InvalidOperationException("Finans dosyası boş."));
+
+            foreach ((string kimlik, FinansV7SirketKaydi? anlik) in _finansAnliklari)
+            {
+                dosya.Sirketler.RemoveAll(x =>
+                    x.SirketKimligi.Equals(kimlik, StringComparison.OrdinalIgnoreCase));
+                if (anlik is not null) dosya.Sirketler.Add(Kopyala(anlik));
+            }
+            dosya.Haberler.RemoveAll(x =>
+                x.TickNumarasi == tickNumarasi && _sirketAnliklari.ContainsKey(x.SirketKimligi));
+            FinansV7Deposu.Guncelle(dosya);
+
+            Task kayit = (Task)(_finansKaydetMetodu.Invoke(_finans, [cancellationToken])
+                ?? throw new InvalidOperationException("Finans kayıt görevi oluşturulamadı."));
+            await kayit;
         }
+        finally { kilit.Release(); }
     }
 
     private static SirketAnlik Al(SirketKaydi s) => new(
@@ -166,10 +239,10 @@ public sealed class BaglantiBazliSirketDonmaYoneticisi
         s.SonBasarisizIsZamani = a.SonBasarisizIs;
     }
 
-    private static SirketIsletimDurumu Kopyala(SirketIsletimDurumu kaynak)
+    private static T Kopyala<T>(T kaynak)
     {
         string json = JsonSerializer.Serialize(kaynak, JsonAyarlari);
-        return JsonSerializer.Deserialize<SirketIsletimDurumu>(json, JsonAyarlari)
-            ?? throw new InvalidOperationException("Şirket işletim anlığı kopyalanamadı.");
+        return JsonSerializer.Deserialize<T>(json, JsonAyarlari)
+            ?? throw new InvalidOperationException($"{typeof(T).Name} anlığı kopyalanamadı.");
     }
 }
