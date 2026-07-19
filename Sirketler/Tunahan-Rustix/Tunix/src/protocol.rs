@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub const PROTOKOL_SURUMU: &str = "0.1";
 pub const SIRKET_KIMLIGI: &str = "tunahan-tunix";
 pub const SIRKET_ADI: &str = "Tunix";
-pub const SUNUCU_SURUMU: &str = "0.7.0";
+pub const SUNUCU_SURUMU: &str = "0.8.0";
 
 pub const MATEMATIK_TOPLA: &str = "matematik.topla";
 pub const MATEMATIK_TOPLA_SURUMU: &str = "1.0";
@@ -27,6 +27,7 @@ pub const MATEMATIK_ASAL_CARPANLAR_SURUMU: &str = "1.0";
 pub const METIN_FREKANS_ANALIZI: &str = "metin.frekans-analizi";
 pub const METIN_FREKANS_ANALIZI_SURUMU: &str = "1.0";
 
+pub const PLATFORM_SURUMU: &str = "1.0";
 pub const TUNIX_KIMLIK_DOGRULA: &str = "tunix.kimlik.dogrula";
 pub const TINGRAM_PROFIL_GETIR: &str = "tunix.tingram.profil.getir";
 pub const TINGRAM_GONDERI_OLUSTUR: &str = "tunix.tingram.gonderi.olustur";
@@ -43,7 +44,36 @@ pub const TMAIL_KLASOR: &str = "tunix.tmail.klasor";
 pub const TLINK_KIMLIK: &str = "tunix.tlink.kimlik";
 pub const TLINK_PAKETLE: &str = "tunix.tlink.paketle";
 pub const TLINK_DOGRULA: &str = "tunix.tlink.dogrula";
-pub const PLATFORM_SURUMU: &str = "1.0";
+
+// V6 standart hizmet kimlikleri.
+pub const STD_KIMLIK_OTURUM: &str = "kimlik.oturum-dogrula";
+pub const STD_KIMLIK_KULLANICI: &str = "kimlik.kullanici-dogrula";
+pub const STD_PROFIL_GETIR: &str = "profil.profil-getir";
+pub const STD_SOSYAL_GONDERI: &str = "sosyal.gonderi-olustur";
+pub const STD_SOSYAL_AKIS: &str = "sosyal.akisi-getir";
+pub const STD_SOSYAL_ETKILESIM: &str = "sosyal.etkilesim-kaydet";
+pub const STD_SOSYAL_YORUM: &str = "sosyal.yorum-ekle";
+pub const STD_SOSYAL_ARAMA: &str = "sosyal.icerik-ara";
+pub const STD_EPOSTA_GONDER: &str = "eposta.gonder";
+pub const STD_EPOSTA_GELEN: &str = "eposta.gelen-kutusu";
+pub const STD_EPOSTA_ARA: &str = "eposta.ara";
+pub const STD_EPOSTA_SPAM: &str = "eposta.spam-kontrol";
+pub const STD_EPOSTA_EK: &str = "eposta.ek-yukle";
+pub const STD_EPOSTA_KLASOR: &str = "eposta.klasor-olustur";
+pub const STD_OS_SUREC: &str = "isletim.surec-baslat";
+pub const STD_OS_SUREC_DURDUR: &str = "isletim.surec-durdur";
+pub const STD_OS_SUREC_LISTE: &str = "isletim.surec-listele";
+pub const STD_OS_KAYNAK: &str = "isletim.kaynak-ata";
+pub const STD_OS_KAYNAK_BIRAK: &str = "isletim.kaynak-birak";
+pub const STD_OS_DOSYA: &str = "isletim.dosya-sistemi";
+pub const STD_OS_PAKET: &str = "isletim.paket-kur";
+pub const STD_OS_PAKET_KALDIR: &str = "isletim.paket-kaldir";
+pub const STD_OS_AG: &str = "isletim.ag-yapilandir";
+pub const STD_OS_GUNCELLEME_KONTROL: &str = "isletim.guncelleme-kontrol";
+pub const STD_OS_GUNCELLEME_KUR: &str = "isletim.guncelleme-kur";
+pub const STD_OS_LOG: &str = "isletim.log-topla";
+pub const STD_OS_UYGULAMA: &str = "isletim.uygulama-calistir";
+pub const STD_GUVENLIK_ISTEK: &str = "guvenlik.istek-dogrula";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,10 +189,16 @@ pub struct SunulanUygulama {
     pub uygulama_adi: &'static str,
     pub surum: &'static str,
     pub kategori: &'static str,
+    pub urun_turu: &'static str,
+    pub dagitim_modeli: &'static str,
     pub aciklama: &'static str,
     pub ozellikler: Vec<UygulamaOzelligi>,
     pub bagimliliklar: Vec<UygulamaBagimliligi>,
     pub desteklenen_protokoller: Vec<&'static str>,
+    pub desteklenen_platformlar: Vec<&'static str>,
+    pub gerekli_platformlar: Vec<&'static str>,
+    pub mimariler: Vec<&'static str>,
+    pub etiketler: Vec<&'static str>,
 }
 
 #[derive(Debug, Serialize)]
@@ -182,6 +218,7 @@ pub struct UygulamaBagimliligi {
     pub uygulama_kimligi: &'static str,
     pub asgari_surum: &'static str,
     pub protokol_kimligi: &'static str,
+    pub bagimlilik_turu: &'static str,
     pub zorunlu: bool,
 }
 
@@ -255,6 +292,6 @@ mod tests {
         let json = serde_json::to_value(mesaj).expect("tanıtım serileştirilmeli");
         assert!(json.get("uygulamalar").is_some());
         assert!(json.get("ozelProtokoller").is_some());
-        assert_eq!(json["sunucuSurumu"], "0.7.0");
+        assert_eq!(json["sunucuSurumu"], "0.8.0");
     }
 }
