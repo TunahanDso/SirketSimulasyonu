@@ -61,9 +61,11 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet clean başarısız oldu." }
 if ($LASTEXITCODE -ne 0) { throw "dotnet build hâlâ hata veriyor." }
 
 if ($Commit) {
-    & git -C $repo add -- \
-        "SirketMotoru/Isletim/EkosistemYoneticisi.cs" \
+    $paths = @(
+        "SirketMotoru/Isletim/EkosistemYoneticisi.cs",
         "SirketMotoru/Isletim/SirketIsletimYoneticisiV2.cs"
+    )
+    & git -C $repo add -- $paths
     if ($LASTEXITCODE -ne 0) { throw "git add başarısız oldu." }
 
     & git -C $repo commit -m "fix: resolve v5 ecosystem and operating compile errors"
