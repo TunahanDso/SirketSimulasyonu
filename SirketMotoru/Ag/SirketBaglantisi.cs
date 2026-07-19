@@ -31,13 +31,9 @@ public sealed class SirketBaglantisi : IAsyncDisposable
     private readonly SirketBaglantiAyari _sirketAyari;
 
     /*
-     * TCP bağlantısında tek bir okuyucu bulunuyor.
-     *
-     * Sağlık kontrolü ile iş isteği aynı anda gönderilirse,
-     * bir metodun diğer metoda ait cevabı okuma riski oluşur.
-     *
-     * Minimal sürümde her şirket bağlantısında aynı anda
-     * yalnızca bir istek-cevap işlemi yürütüyoruz.
+     * Sağlık kontrolü, iş isteği ve finans güncellemesi aynı
+     * TCP akışını kullanır. Cevapların birbirine karışmaması
+     * için bağlantıda aynı anda tek protokol işlemi yürütülür.
      */
     private readonly SemaphoreSlim _istekCevapKilidi =
         new(1, 1);
@@ -194,11 +190,8 @@ public sealed class SirketBaglantisi : IAsyncDisposable
                         leaveOpen:
                             true)
                     {
-                        AutoFlush =
-                            true,
-
-                        NewLine =
-                            "\n"
+                        AutoFlush = true,
+                        NewLine = "\n"
                     };
 
                 await _istekCevapKilidi.WaitAsync(
@@ -235,6 +228,9 @@ public sealed class SirketBaglantisi : IAsyncDisposable
                 Kayit.Durum =
                     SirketDurumu.Bagli;
 
+                Kayit.SonBaglantiZamani =
+                    DateTimeOffset.UtcNow;
+
                 string hizmetMetni =
                     Kayit.Hizmetler.Count == 0
                         ? "Henüz hizmet bildirilmedi"
@@ -264,7 +260,7 @@ public sealed class SirketBaglantisi : IAsyncDisposable
 
                 KonsolKayitcisi.Uyari(
                     $"{_sirketAyari.SirketAdi} " +
-                    $"bağlantı zaman aşımına uğradı.");
+                    "bağlantı zaman aşımına uğradı.");
 
                 await BaglantiyiKapatIcAsync();
 
@@ -279,8 +275,7 @@ public sealed class SirketBaglantisi : IAsyncDisposable
 
                 KonsolKayitcisi.Uyari(
                     $"{_sirketAyari.SirketAdi} " +
-                    $"bağlanamadı: " +
-                    $"{exception.Message}");
+                    $"bağlanamadı: {exception.Message}");
 
                 await BaglantiyiKapatIcAsync();
 
@@ -434,7 +429,7 @@ public sealed class SirketBaglantisi : IAsyncDisposable
 
                 KonsolKayitcisi.Uyari(
                     $"{Kayit.SirketAdi} sağlık kontrolüne " +
-                    $"zamanında cevap vermedi.");
+                    "zamanında cevap vermedi.");
 
                 await BaglantiyiKapatGuvenliAsync();
 
@@ -588,12 +583,6 @@ public sealed class SirketBaglantisi : IAsyncDisposable
                 $"İş: {isIstegi.IsKimligi} | " +
                 $"Sınır: {isIstegi.ZamanAsimiMs} ms");
 
-            /*
-             * Zaman aşımından sonra bağlantıyı kapatıyoruz.
-             *
-             * Çünkü şirket geç kalan sonucu daha sonra gönderirse,
-             * aynı TCP akışındaki sonraki isteğin cevabı sanılabilir.
-             */
             await BaglantiyiKapatGuvenliAsync();
 
             throw new TimeoutException(
@@ -607,6 +596,107 @@ public sealed class SirketBaglantisi : IAsyncDisposable
             kronometre.Stop();
 
             throw;
+        }
+        finally
+        {
+            _istekCevapKilidi.Release();
+        }
+    }
+
+    public async Task FinansDurumuGonderAsync(
+        long tickNumarasi,
+        CancellationToken cancellationToken)
+    {
+        DisposeEdilmediginiDogrula();
+
+        if (!Bagli)
+        {
+            return;
+        }
+
+        FinansDurumuMesaji mesaj =
+            new()
+            {
+                MesajTuru =
+                    MesajTurleri.FinansDurumu,
+
+                MesajKimligi =
+                    YeniMesajKimligi(),
+
+                ProtokolSurumu =
+                    _motorAyarlari.ProtokolSurumu,
+
+                SirketKimligi =
+                    Kayit.SirketKimligi,
+
+                TickNumarasi =
+                    tickNumarasi,
+
+                Kasa =
+                    Kayit.Kasa,
+
+                ToplamGelir =
+                    Kayit.ToplamGelir,
+
+                ToplamIade =
+                    Kayit.ToplamIade,
+
+                ToplamCeza =
+                    Kayit.ToplamCeza,
+
+                BekleyenOdeme =
+                    Kayit.BekleyenOdeme,
+
+                NetGelir =
+                    Kayit.NetGelir,
+
+                TamamlananIsSayisi =
+                    Kayit.TamamlananIsSayisi,
+
+                BasarisizIsSayisi =
+                    Kayit.BasarisizIsSayisi,
+
+                ZamanAsiminaUgrayanIsSayisi =
+                    Kayit.ZamanAsiminaUgrayanIsSayisi,
+
+                IptalEdilenIsSayisi =
+                    Kayit.IptalEdilenIsSayisi,
+
+                ItibarPuani =
+                    Kayit.ItibarPuani,
+
+                GuvenilirlikPuani =
+                    Kayit.GuvenilirlikPuani,
+
+                OrtalamaMusteriMemnuniyeti =
+                    Kayit.OrtalamaMusteriMemnuniyeti,
+
+                GuncellenmeZamani =
+                    DateTimeOffset.UtcNow
+            };
+
+        mesaj.Dogrula();
+
+        await _istekCevapKilidi.WaitAsync(
+            cancellationToken);
+
+        try
+        {
+            if (!Bagli)
+            {
+                return;
+            }
+
+            await MesajGonderAsync(
+                mesaj,
+                cancellationToken);
+
+            KonsolKayitcisi.Bilgi(
+                $"Finans durumu gönderildi | " +
+                $"Şirket: {Kayit.SirketAdi} | " +
+                $"Tick: {tickNumarasi} | " +
+                $"Kasa: {Kayit.Kasa:N2} | " +
+                $"Net gelir: {Kayit.NetGelir:N2}");
         }
         finally
         {
@@ -683,13 +773,6 @@ public sealed class SirketBaglantisi : IAsyncDisposable
             throw new InvalidOperationException(
                 $"Şirket tanıtımı beklenirken " +
                 $"{tanitim.MesajTuru} mesajı geldi.");
-        }
-
-        if (string.IsNullOrWhiteSpace(
-                tanitim.SirketKimligi))
-        {
-            throw new InvalidOperationException(
-                "Şirket kimliği boş olamaz.");
         }
 
         return tanitim;
@@ -941,15 +1024,13 @@ public sealed class SirketBaglantisi : IAsyncDisposable
         foreach (SunulanHizmet hizmet in
                  hizmetler)
         {
-            if (hizmet is null)
-            {
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(
+            if (hizmet is null ||
+                string.IsNullOrWhiteSpace(
                     hizmet.HizmetKimligi) ||
                 string.IsNullOrWhiteSpace(
-                    hizmet.HizmetSurumu))
+                    hizmet.HizmetSurumu) ||
+                hizmet.BirimFiyat <= 0 ||
+                hizmet.AzamiEszamanliIs <= 0)
             {
                 continue;
             }
@@ -962,16 +1043,6 @@ public sealed class SirketBaglantisi : IAsyncDisposable
 
             string anahtar =
                 $"{hizmetKimligi}@{hizmetSurumu}";
-
-            /*
-             * Geçersiz fiyat ve kapasite bildiren hizmetler
-             * şirket kaydına alınmaz.
-             */
-            if (hizmet.BirimFiyat <= 0 ||
-                hizmet.AzamiEszamanliIs <= 0)
-            {
-                continue;
-            }
 
             temizHizmetler[anahtar] =
                 new SunulanHizmet
@@ -1019,10 +1090,6 @@ public sealed class SirketBaglantisi : IAsyncDisposable
             this);
     }
 
-    /*
-     * İstek-cevap kilidi tutulurken çağrılabilir.
-     * Bu nedenle tekrar istek-cevap kilidi almaya çalışmaz.
-     */
     private async Task BaglantiyiKapatGuvenliAsync()
     {
         await _baglantiKilidi.WaitAsync();
