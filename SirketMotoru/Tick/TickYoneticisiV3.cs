@@ -23,9 +23,9 @@ public sealed class TickYoneticisi
     private readonly EkonomiDengeV7Yoneticisi _ekonomiDengeV7Yoneticisi;
     private readonly FinansV7Yoneticisi _finansV7Yoneticisi;
     private readonly IsYoneticisi _isYoneticisi;
+    private readonly BaglantiBazliSirketDonmaYoneticisi _donmaYoneticisi;
     private long _tickNumarasi;
     private bool _calisiyor;
-    private int _sonBeklemeBagliSayisi = -1;
 
     public long TickNumarasi => Interlocked.Read(ref _tickNumarasi);
     public bool Calisiyor => _calisiyor;
@@ -55,11 +55,13 @@ public sealed class TickYoneticisi
         _ekonomiDengeV7Yoneticisi = ekonomiDengeV7Yoneticisi ?? throw new ArgumentNullException(nameof(ekonomiDengeV7Yoneticisi));
         _finansV7Yoneticisi = finansV7Yoneticisi ?? throw new ArgumentNullException(nameof(finansV7Yoneticisi));
         if (ayarlar.TickSuresiSaniye <= 0) throw new ArgumentOutOfRangeException(nameof(ayarlar));
-        _isYoneticisi = new IsYoneticisi(sirketYoneticisi, musteriYoneticisi, new SonucDogrulayicisi());
 
-        // Finans defteri her tamamlanmış tickte kalıcı yazıldığı için restart sonrası
-        // zaman tabanlı kredi, SLA, yatırım ve olaylar kaldıkları tickten devam eder.
-        _tickNumarasi = Math.Max(0, FinansV7Deposu.Getir().SonTick);
+        _isYoneticisi = new IsYoneticisi(sirketYoneticisi, musteriYoneticisi, new SonucDogrulayicisi());
+        _donmaYoneticisi = new BaglantiBazliSirketDonmaYoneticisi(
+            sirketYoneticisi,
+            isletimYoneticisi,
+            finansV7Yoneticisi);
+        _tickNumarasi = Math.Max(0, TickSaatDeposu.SonTamamlananTick);
     }
 
     public async Task BaslatAsync(CancellationToken cancellationToken)
@@ -68,57 +70,47 @@ public sealed class TickYoneticisi
         _calisiyor = true;
         KonsolKayitcisi.Bilgi(
             $"Tick sistemi V8.1 başlatıldı | Son tamamlanan tick: {TickNumarasi} | " +
-            $"Tick süresi: {_ayarlar.TickSuresiSaniye} saniye | Tüm şirketler bağlanmadan ekonomi bekler.");
+            $"Tick süresi: {_ayarlar.TickSuresiSaniye} saniye | Bağlı şirketler oynar, kapalı şirketler donar.");
+
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                int toplamSirket = _sirketYoneticisi.SirketKayitlari.Count;
-                int bagliSirket = await _sirketYoneticisi.BaglantilariHazirlaAsync(
-                    TickNumarasi,
-                    cancellationToken);
-
-                if (bagliSirket < toplamSirket)
-                {
-                    if (_sonBeklemeBagliSayisi != bagliSirket)
-                    {
-                        KonsolKayitcisi.Uyari(
-                            $"EKONOMİ BEKLEME MODU | Bağlı şirket: {bagliSirket}/{toplamSirket} | " +
-                            "Tick saati, müşteri talepleri, giderler, krediler, olaylar ve cezalar ilerlemiyor.");
-                        _sonBeklemeBagliSayisi = bagliSirket;
-                    }
-
-                    try { await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken); }
-                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
-                    continue;
-                }
-
-                if (_sonBeklemeBagliSayisi >= 0)
-                {
-                    KonsolKayitcisi.Basari(
-                        $"Tüm şirketler hazır ({bagliSirket}/{toplamSirket}); ekonomi kaldığı yerden devam ediyor.");
-                    _sonBeklemeBagliSayisi = -1;
-                }
-
-                long tick = Interlocked.Increment(ref _tickNumarasi);
+                long tick = checked(TickNumarasi + 1);
                 Stopwatch kronometre = Stopwatch.StartNew();
                 KonsolKayitcisi.Tick(tick);
-                try { await TickCalistirAsync(tick, cancellationToken); }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
+
+                try
+                {
+                    await TickCalistirAsync(tick, cancellationToken);
+                    await TickSaatDeposu.TamamlandiAsync(tick, cancellationToken);
+                    Interlocked.Exchange(ref _tickNumarasi, tick);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
                 catch (Exception e)
                 {
-                    KonsolKayitcisi.Hata($"Tick {tick} çalıştırılırken hata oluştu: {e.Message}");
+                    KonsolKayitcisi.Hata($"Tick {tick} tamamlanamadı; tick saati ilerletilmedi: {e.Message}");
                     KonsolKayitcisi.Hata(e.ToString());
+                    throw new InvalidOperationException(
+                        $"Tick {tick} atomik olarak tamamlanamadığı için motor güvenli biçimde durduruldu.",
+                        e);
                 }
                 finally { kronometre.Stop(); }
 
-                KonsolKayitcisi.Bilgi($"Tick {tick} tamamlandı. İşlem süresi: {kronometre.Elapsed.TotalMilliseconds:N2} ms.");
+                KonsolKayitcisi.Bilgi(
+                    $"Tick {tick} başarıyla tamamlandı ve kalıcı saate işlendi. " +
+                    $"İşlem süresi: {kronometre.Elapsed.TotalMilliseconds:N2} ms.");
+
                 TimeSpan bekleme = TimeSpan.FromSeconds(_ayarlar.TickSuresiSaniye) - kronometre.Elapsed;
                 if (bekleme <= TimeSpan.Zero)
                 {
                     KonsolKayitcisi.Uyari($"Tick {tick} hedef süreden uzun sürdü; sonraki tick beklemeden başlayacak.");
                     continue;
                 }
+
                 try { await Task.Delay(bekleme, cancellationToken); }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
             }
@@ -134,33 +126,52 @@ public sealed class TickYoneticisi
     private async Task TickCalistirAsync(long tickNumarasi, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        CezaV8Deposu.TickBaslat(tickNumarasi);
-        _musteriYoneticisi.TickBasindaMusterileriGuncelle(tickNumarasi);
-        await _sirketYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
-        await _ekosistemYoneticisi.PazariHazirlaAsync(tickNumarasi, cancellationToken);
-        _musteriIsletimSistemiYoneticisi.TickCalistir(tickNumarasi);
+        await _donmaYoneticisi.TickOncesiAsync(cancellationToken);
 
-        await _finansV7Yoneticisi.TickOncesiAsync(tickNumarasi, cancellationToken);
-        await _ekonomiDengeV7Yoneticisi.TickOncesiAsync(cancellationToken);
-        await _ekonomiV6Yoneticisi.TickOncesiAsync(tickNumarasi, cancellationToken);
-        await _pazarGelirDuzeltmeYoneticisi.TickOncesiHazirlaAsync(tickNumarasi, cancellationToken);
-        await _isletimYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
-        await _pazarFiyatYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
-        await _pazarGelirDuzeltmeYoneticisi.TickSonrasiDuzeltAsync(tickNumarasi, cancellationToken);
+        try
+        {
+            CezaV8Deposu.TickBaslat(tickNumarasi);
+            _musteriYoneticisi.TickBasindaMusterileriGuncelle(tickNumarasi);
+            await _sirketYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
+            await _ekosistemYoneticisi.PazariHazirlaAsync(tickNumarasi, cancellationToken);
+            _musteriIsletimSistemiYoneticisi.TickCalistir(tickNumarasi);
 
-        IReadOnlyList<HizmetTalebi> talepler = _musteriYoneticisi.TickTalepleriniOlustur(tickNumarasi);
-        CanliPanoDurumDeposu.TalepleriGuncelle(tickNumarasi, talepler);
-        TalepleriRaporla(tickNumarasi, talepler);
-        IsIslemeOzeti islemeOzeti = await _isYoneticisi.TalepleriIsleAsync(tickNumarasi, talepler, cancellationToken);
-        CanliPanoDurumDeposu.IslemeOzetiniGuncelle(islemeOzeti);
+            await _finansV7Yoneticisi.TickOncesiAsync(tickNumarasi, cancellationToken);
+            await _ekonomiDengeV7Yoneticisi.TickOncesiAsync(cancellationToken);
+            await _ekonomiV6Yoneticisi.TickOncesiAsync(tickNumarasi, cancellationToken);
+            await _pazarGelirDuzeltmeYoneticisi.TickOncesiHazirlaAsync(tickNumarasi, cancellationToken);
+            await _isletimYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
+            await _pazarFiyatYoneticisi.TickCalistirAsync(tickNumarasi, cancellationToken);
+            await _pazarGelirDuzeltmeYoneticisi.TickSonrasiDuzeltAsync(tickNumarasi, cancellationToken);
 
-        await _ekonomiV6Yoneticisi.TickSonuAsync(tickNumarasi, cancellationToken);
-        await _ekonomiDengeV7Yoneticisi.TickSonuAsync(tickNumarasi, cancellationToken);
-        await _finansV7Yoneticisi.TickSonuAsync(tickNumarasi, cancellationToken);
-        CezaV8Deposu.TickBitir(tickNumarasi);
-        await _sirketYoneticisi.BilancolariKaydetVeYayinlaAsync(tickNumarasi, cancellationToken);
-        await _musteriYoneticisi.GerekirseKaydetAsync(tickNumarasi, cancellationToken);
-        TickOzetiniYaz(tickNumarasi, talepler);
+            IReadOnlyList<HizmetTalebi> talepler = _musteriYoneticisi.TickTalepleriniOlustur(tickNumarasi);
+            CanliPanoDurumDeposu.TalepleriGuncelle(tickNumarasi, talepler);
+            TalepleriRaporla(tickNumarasi, talepler);
+            IsIslemeOzeti islemeOzeti = await _isYoneticisi.TalepleriIsleAsync(
+                tickNumarasi,
+                talepler,
+                cancellationToken);
+            CanliPanoDurumDeposu.IslemeOzetiniGuncelle(islemeOzeti);
+
+            // Kapalı şirketlere eski katmanların yazdığı her şey tick kapanmadan geri alınır.
+            await _donmaYoneticisi.GeriYukleAsync(tickNumarasi, cancellationToken);
+
+            await _ekonomiV6Yoneticisi.TickSonuAsync(tickNumarasi, cancellationToken);
+            await _ekonomiDengeV7Yoneticisi.TickSonuAsync(tickNumarasi, cancellationToken);
+            await _finansV7Yoneticisi.TickSonuAsync(tickNumarasi, cancellationToken);
+
+            // Finans ve grafik kapanış katmanları da kapalı şirkete dokunamaz.
+            await _donmaYoneticisi.GeriYukleAsync(tickNumarasi, cancellationToken);
+            CezaV8Deposu.TickBitir(tickNumarasi);
+            await _sirketYoneticisi.BilancolariKaydetVeYayinlaAsync(tickNumarasi, cancellationToken);
+            await _musteriYoneticisi.GerekirseKaydetAsync(tickNumarasi, cancellationToken);
+            TickOzetiniYaz(tickNumarasi, talepler);
+        }
+        finally
+        {
+            // Hata veya iptalde kapalı şirketlerin anlık görüntüsü mutlaka geri yüklenir.
+            await _donmaYoneticisi.GeriYukleAsync(tickNumarasi, CancellationToken.None);
+        }
     }
 
     private static void TalepleriRaporla(long tickNumarasi, IReadOnlyList<HizmetTalebi> talepler)
@@ -187,11 +198,16 @@ public sealed class TickYoneticisi
         int fiyatKaybi = fiyatPazari.Urunler.Sum(x => x.BuTickFiyatKaybi + x.BuTickEngellenenYeniKullanici);
         decimal tickGelir = finans.Sirketler.Sum(x => x.Tickler.LastOrDefault()?.ToplamGelir ?? 0);
         decimal tickGider = finans.Sirketler.Sum(x => x.Tickler.LastOrDefault()?.ToplamGider ?? 0);
+        int bagli = _sirketYoneticisi.SirketKayitlari.Count(x => x.BagliMi);
+        int toplam = _sirketYoneticisi.SirketKayitlari.Count;
+
         KonsolKayitcisi.Bilgi(
-            $"Tick {tickNumarasi} özeti | Aktif müşteri: {_musteriYoneticisi.AktifMusteriSayisi} | " +
+            $"Tick {tickNumarasi} özeti | Bağlı şirket: {bagli}/{toplam} | " +
+            $"Aktif müşteri: {_musteriYoneticisi.AktifMusteriSayisi} | " +
             $"OS kullanan: {osKullanan} | OS bekleyen: {Math.Max(0, _musteriYoneticisi.AktifMusteriSayisi - osKullanan)} | " +
             $"Fiyat nedeniyle reddedilen/kaçan: {fiyatKaybi} | " +
-            $"V6 gerçek kapasite: {v6.Sirketler.Sum(x => x.GercekKapasiteBirimi)} | V6 kullanılan kapasite: {v6.Sirketler.Sum(x => x.KullanilanKapasiteBirimi)} | " +
+            $"V6 gerçek kapasite: {v6.Sirketler.Sum(x => x.GercekKapasiteBirimi)} | " +
+            $"V6 kullanılan kapasite: {v6.Sirketler.Sum(x => x.KullanilanKapasiteBirimi)} | " +
             $"Tick gelir: {tickGelir:N2} | Tick gider: {tickGider:N2} | Tick net: {tickGelir - tickGider:N2} | " +
             $"Yeni talep: {talepler.Count} | Talep bütçesi: {talepler.Sum(t => t.AzamiButce):N2} | " +
             $"Şirket kasaları: {_sirketYoneticisi.SirketKayitlari.Sum(s => s.Kasa):N2} | Ceza V8.1 aktif");
@@ -205,6 +221,9 @@ public sealed class TickYoneticisi
             await _musteriYoneticisi.KaydetAsync(CancellationToken.None);
             await _sirketYoneticisi.BilancolariKaydetAsync(CancellationToken.None);
         }
-        catch (Exception e) { KonsolKayitcisi.Hata($"Son kayıtlar yazılamadı: {e.Message}"); }
+        catch (Exception e)
+        {
+            KonsolKayitcisi.Hata($"Son kayıtlar yazılamadı: {e.Message}");
+        }
     }
 }
