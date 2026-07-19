@@ -25,6 +25,7 @@ public sealed class TickYoneticisi
     private readonly IsYoneticisi _isYoneticisi;
     private long _tickNumarasi;
     private bool _calisiyor;
+    private int _sonBeklemeBagliSayisi = -1;
 
     public long TickNumarasi => Interlocked.Read(ref _tickNumarasi);
     public bool Calisiyor => _calisiyor;
@@ -55,17 +56,50 @@ public sealed class TickYoneticisi
         _finansV7Yoneticisi = finansV7Yoneticisi ?? throw new ArgumentNullException(nameof(finansV7Yoneticisi));
         if (ayarlar.TickSuresiSaniye <= 0) throw new ArgumentOutOfRangeException(nameof(ayarlar));
         _isYoneticisi = new IsYoneticisi(sirketYoneticisi, musteriYoneticisi, new SonucDogrulayicisi());
+
+        // Finans defteri her tamamlanmış tickte kalıcı yazıldığı için restart sonrası
+        // zaman tabanlı kredi, SLA, yatırım ve olaylar kaldıkları tickten devam eder.
+        _tickNumarasi = Math.Max(0, FinansV7Deposu.Getir().SonTick);
     }
 
     public async Task BaslatAsync(CancellationToken cancellationToken)
     {
         if (_calisiyor) throw new InvalidOperationException("Tick sistemi zaten çalışıyor.");
         _calisiyor = true;
-        KonsolKayitcisi.Bilgi($"Tick sistemi V8 başlatıldı. Tick süresi: {_ayarlar.TickSuresiSaniye} saniye.");
+        KonsolKayitcisi.Bilgi(
+            $"Tick sistemi V8.1 başlatıldı | Son tamamlanan tick: {TickNumarasi} | " +
+            $"Tick süresi: {_ayarlar.TickSuresiSaniye} saniye | Tüm şirketler bağlanmadan ekonomi bekler.");
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
+                int toplamSirket = _sirketYoneticisi.SirketKayitlari.Count;
+                int bagliSirket = await _sirketYoneticisi.BaglantilariHazirlaAsync(
+                    TickNumarasi,
+                    cancellationToken);
+
+                if (bagliSirket < toplamSirket)
+                {
+                    if (_sonBeklemeBagliSayisi != bagliSirket)
+                    {
+                        KonsolKayitcisi.Uyari(
+                            $"EKONOMİ BEKLEME MODU | Bağlı şirket: {bagliSirket}/{toplamSirket} | " +
+                            "Tick saati, müşteri talepleri, giderler, krediler, olaylar ve cezalar ilerlemiyor.");
+                        _sonBeklemeBagliSayisi = bagliSirket;
+                    }
+
+                    try { await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken); }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
+                    continue;
+                }
+
+                if (_sonBeklemeBagliSayisi >= 0)
+                {
+                    KonsolKayitcisi.Basari(
+                        $"Tüm şirketler hazır ({bagliSirket}/{toplamSirket}); ekonomi kaldığı yerden devam ediyor.");
+                    _sonBeklemeBagliSayisi = -1;
+                }
+
                 long tick = Interlocked.Increment(ref _tickNumarasi);
                 Stopwatch kronometre = Stopwatch.StartNew();
                 KonsolKayitcisi.Tick(tick);
@@ -153,7 +187,6 @@ public sealed class TickYoneticisi
         int fiyatKaybi = fiyatPazari.Urunler.Sum(x => x.BuTickFiyatKaybi + x.BuTickEngellenenYeniKullanici);
         decimal tickGelir = finans.Sirketler.Sum(x => x.Tickler.LastOrDefault()?.ToplamGelir ?? 0);
         decimal tickGider = finans.Sirketler.Sum(x => x.Tickler.LastOrDefault()?.ToplamGider ?? 0);
-        var ceza = CezaV8Deposu.GenelDurum(_sirketYoneticisi.SirketKayitlari);
         KonsolKayitcisi.Bilgi(
             $"Tick {tickNumarasi} özeti | Aktif müşteri: {_musteriYoneticisi.AktifMusteriSayisi} | " +
             $"OS kullanan: {osKullanan} | OS bekleyen: {Math.Max(0, _musteriYoneticisi.AktifMusteriSayisi - osKullanan)} | " +
@@ -161,7 +194,7 @@ public sealed class TickYoneticisi
             $"V6 gerçek kapasite: {v6.Sirketler.Sum(x => x.GercekKapasiteBirimi)} | V6 kullanılan kapasite: {v6.Sirketler.Sum(x => x.KullanilanKapasiteBirimi)} | " +
             $"Tick gelir: {tickGelir:N2} | Tick gider: {tickGider:N2} | Tick net: {tickGelir - tickGider:N2} | " +
             $"Yeni talep: {talepler.Count} | Talep bütçesi: {talepler.Sum(t => t.AzamiButce):N2} | " +
-            $"Şirket kasaları: {_sirketYoneticisi.SirketKayitlari.Sum(s => s.Kasa):N2} | Ceza V8 aktif");
+            $"Şirket kasaları: {_sirketYoneticisi.SirketKayitlari.Sum(s => s.Kasa):N2} | Ceza V8.1 aktif");
     }
 
     private async Task SonKayitlariYapAsync()
