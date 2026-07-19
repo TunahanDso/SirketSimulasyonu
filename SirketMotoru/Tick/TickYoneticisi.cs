@@ -212,7 +212,17 @@ public sealed class TickYoneticisi
             cancellationToken);
 
         /*
-         * 5. Müşteri kayıtları belirlenen tick
+         * 5. İşlerin finansal etkileri şirket bilanço
+         *    veritabanına atomik olarak yazılır ve her bağlı
+         *    şirket sunucusuna güncel finans durumu gönderilir.
+         */
+        await _sirketYoneticisi
+            .BilancolariKaydetVeYayinlaAsync(
+                tickNumarasi,
+                cancellationToken);
+
+        /*
+         * 6. Müşteri kayıtları belirlenen tick
          *    aralığında disk üzerine yazılır.
          */
         await _musteriYoneticisi
@@ -221,7 +231,7 @@ public sealed class TickYoneticisi
                 cancellationToken);
 
         /*
-         * 6. Tick özeti konsola yazılır.
+         * 7. Tick özeti konsola yazılır.
          */
         TickOzetiniYaz(
             tickNumarasi,
@@ -298,6 +308,12 @@ public sealed class TickYoneticisi
             talepler.Sum(
                 talep => talep.AzamiButce);
 
+        decimal toplamSirketKasasi =
+            _sirketYoneticisi
+                .SirketKayitlari
+                .Sum(
+                    sirket => sirket.Kasa);
+
         KonsolKayitcisi.Bilgi(
             $"Tick {tickNumarasi} özeti | " +
             $"Aktif müşteri: {aktifMusteriSayisi} | " +
@@ -306,7 +322,9 @@ public sealed class TickYoneticisi
             $"Müşteri bakiyesi: " +
             $"{toplamMusteriBakiyesi:N2} | " +
             $"Toplam harcama: " +
-            $"{toplamMusteriHarcamasi:N2}");
+            $"{toplamMusteriHarcamasi:N2} | " +
+            $"Şirket kasaları: " +
+            $"{toplamSirketKasasi:N2}");
     }
 
     private TimeSpan TickBeklemeSuresiniHesapla(
@@ -328,14 +346,18 @@ public sealed class TickYoneticisi
                 .KaydetAsync(
                     CancellationToken.None);
 
+            await _sirketYoneticisi
+                .BilancolariKaydetAsync(
+                    CancellationToken.None);
+
             KonsolKayitcisi.Basari(
-                "Motor kapanmadan önce müşteri " +
-                "verileri son kez kaydedildi.");
+                "Motor kapanmadan önce müşteri verileri " +
+                "ve şirket bilançoları son kez kaydedildi.");
         }
         catch (Exception exception)
         {
             KonsolKayitcisi.Hata(
-                $"Motor kapanırken müşteri verileri " +
+                $"Motor kapanırken kalıcı veriler " +
                 $"kaydedilemedi: {exception.Message}");
 
             KonsolKayitcisi.Hata(
