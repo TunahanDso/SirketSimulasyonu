@@ -158,7 +158,7 @@ Elle kontrol için:
 dotnet build .\SirketMotoru\SirketMotoru.csproj
 cd .\Sirketler\Tunahan-Rustix\Tunix
 cargo test
-cd ..\..\..\Ilayda-Python\IlosTech
+cd ..\..\Ilayda-Python\IlosTech
 python -m unittest -v
 ```
 
