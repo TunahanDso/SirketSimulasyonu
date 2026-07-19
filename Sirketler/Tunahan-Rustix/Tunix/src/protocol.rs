@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub const PROTOKOL_SURUMU: &str = "0.1";
 pub const SIRKET_KIMLIGI: &str = "tunahan-tunix";
 pub const SIRKET_ADI: &str = "Tunix";
-pub const SUNUCU_SURUMU: &str = "0.6.0";
+pub const SUNUCU_SURUMU: &str = "0.7.0";
 
 pub const MATEMATIK_TOPLA: &str = "matematik.topla";
 pub const MATEMATIK_TOPLA_SURUMU: &str = "1.0";
@@ -26,6 +26,24 @@ pub const MATEMATIK_ASAL_CARPANLAR: &str = "matematik.asal-carpanlar";
 pub const MATEMATIK_ASAL_CARPANLAR_SURUMU: &str = "1.0";
 pub const METIN_FREKANS_ANALIZI: &str = "metin.frekans-analizi";
 pub const METIN_FREKANS_ANALIZI_SURUMU: &str = "1.0";
+
+pub const TUNIX_KIMLIK_DOGRULA: &str = "tunix.kimlik.dogrula";
+pub const TINGRAM_PROFIL_GETIR: &str = "tunix.tingram.profil.getir";
+pub const TINGRAM_GONDERI_OLUSTUR: &str = "tunix.tingram.gonderi.olustur";
+pub const TINGRAM_AKISI_GETIR: &str = "tunix.tingram.akisi.getir";
+pub const TINGRAM_ETKILESIM: &str = "tunix.tingram.etkilesim";
+pub const TINGRAM_YORUM: &str = "tunix.tingram.yorum";
+pub const TINGRAM_ARAMA: &str = "tunix.tingram.arama";
+pub const TMAIL_GONDER: &str = "tunix.tmail.gonder";
+pub const TMAIL_GELEN_KUTUSU: &str = "tunix.tmail.gelen-kutusu";
+pub const TMAIL_ARA: &str = "tunix.tmail.ara";
+pub const TMAIL_SPAM_KONTROL: &str = "tunix.tmail.spam-kontrol";
+pub const TMAIL_EK_YUKLE: &str = "tunix.tmail.ek-yukle";
+pub const TMAIL_KLASOR: &str = "tunix.tmail.klasor";
+pub const TLINK_KIMLIK: &str = "tunix.tlink.kimlik";
+pub const TLINK_PAKETLE: &str = "tunix.tlink.paketle";
+pub const TLINK_DOGRULA: &str = "tunix.tlink.dogrula";
+pub const PLATFORM_SURUMU: &str = "1.0";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -119,6 +137,8 @@ pub struct SirketTanitimMesaji {
     pub sirket_adi: &'static str,
     pub sunucu_surumu: &'static str,
     pub hizmetler: Vec<SunulanHizmet>,
+    pub uygulamalar: Vec<SunulanUygulama>,
+    pub ozel_protokoller: Vec<SunulanOzelProtokol>,
 }
 
 #[derive(Debug, Serialize)]
@@ -130,6 +150,61 @@ pub struct SunulanHizmet {
     pub birim_fiyat: Decimal,
     pub azami_eszamanli_is: u32,
     pub aktif: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SunulanUygulama {
+    pub uygulama_kimligi: &'static str,
+    pub uygulama_adi: &'static str,
+    pub surum: &'static str,
+    pub kategori: &'static str,
+    pub aciklama: &'static str,
+    pub ozellikler: Vec<UygulamaOzelligi>,
+    pub bagimliliklar: Vec<UygulamaBagimliligi>,
+    pub desteklenen_protokoller: Vec<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UygulamaOzelligi {
+    pub ozellik_kimligi: &'static str,
+    pub hizmet_kimligi: &'static str,
+    pub hizmet_surumu: &'static str,
+    pub aciklama: &'static str,
+    pub zorunlu: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UygulamaBagimliligi {
+    pub sirket_kimligi: &'static str,
+    pub uygulama_kimligi: &'static str,
+    pub asgari_surum: &'static str,
+    pub protokol_kimligi: &'static str,
+    pub zorunlu: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SunulanOzelProtokol {
+    pub protokol_kimligi: &'static str,
+    pub protokol_adi: &'static str,
+    pub surum: &'static str,
+    pub aciklama: &'static str,
+    pub sema_kimligi: &'static str,
+    pub sema_ozeti: &'static str,
+    pub yetkinlikler: Vec<ProtokolYetkinligi>,
+    pub uyumlu_protokoller: Vec<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProtokolYetkinligi {
+    pub yetkinlik_kimligi: &'static str,
+    pub hizmet_kimligi: &'static str,
+    pub hizmet_surumu: &'static str,
+    pub aciklama: &'static str,
 }
 
 #[derive(Debug, Serialize)]
@@ -165,35 +240,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tanitim_mesaji_on_hizmeti_icerir() {
-        let hizmetler = vec![
-            SunulanHizmet { hizmet_kimligi: MATEMATIK_TOPLA, hizmet_surumu: MATEMATIK_TOPLA_SURUMU, birim_fiyat: Decimal::new(5, 0), azami_eszamanli_is: 1, aktif: true },
-            SunulanHizmet { hizmet_kimligi: MATEMATIK_CARP, hizmet_surumu: MATEMATIK_CARP_SURUMU, birim_fiyat: Decimal::new(8, 0), azami_eszamanli_is: 1, aktif: true },
-            SunulanHizmet { hizmet_kimligi: VERI_ORTALAMA_HESAPLA, hizmet_surumu: VERI_ORTALAMA_HESAPLA_SURUMU, birim_fiyat: Decimal::new(15, 0), azami_eszamanli_is: 1, aktif: true },
-            SunulanHizmet { hizmet_kimligi: METIN_KELIME_SAY, hizmet_surumu: METIN_KELIME_SAY_SURUMU, birim_fiyat: Decimal::new(7, 0), azami_eszamanli_is: 1, aktif: true },
-            SunulanHizmet { hizmet_kimligi: METIN_KARAKTER_SAY, hizmet_surumu: METIN_KARAKTER_SAY_SURUMU, birim_fiyat: Decimal::new(4, 0), azami_eszamanli_is: 1, aktif: true },
-            SunulanHizmet { hizmet_kimligi: VERI_MEDYAN_HESAPLA, hizmet_surumu: VERI_MEDYAN_HESAPLA_SURUMU, birim_fiyat: Decimal::new(22, 0), azami_eszamanli_is: 1, aktif: true },
-            SunulanHizmet { hizmet_kimligi: VERI_STANDART_SAPMA, hizmet_surumu: VERI_STANDART_SAPMA_SURUMU, birim_fiyat: Decimal::new(35, 0), azami_eszamanli_is: 1, aktif: true },
-            SunulanHizmet { hizmet_kimligi: DIZI_SIRALA, hizmet_surumu: DIZI_SIRALA_SURUMU, birim_fiyat: Decimal::new(28, 0), azami_eszamanli_is: 1, aktif: true },
-            SunulanHizmet { hizmet_kimligi: MATEMATIK_ASAL_CARPANLAR, hizmet_surumu: MATEMATIK_ASAL_CARPANLAR_SURUMU, birim_fiyat: Decimal::new(45, 0), azami_eszamanli_is: 1, aktif: true },
-            SunulanHizmet { hizmet_kimligi: METIN_FREKANS_ANALIZI, hizmet_surumu: METIN_FREKANS_ANALIZI_SURUMU, birim_fiyat: Decimal::new(32, 0), azami_eszamanli_is: 1, aktif: true },
-        ];
-
+    fn yeni_tanitim_mesaji_manifest_alanlarini_serilestirir() {
         let mesaj = SirketTanitimMesaji {
             mesaj_turu: "sirketTanitim",
-            mesaj_kimligi: "tunix-test-1".to_string(),
+            mesaj_kimligi: "test".to_string(),
             protokol_surumu: PROTOKOL_SURUMU,
             sirket_kimligi: SIRKET_KIMLIGI,
             sirket_adi: SIRKET_ADI,
             sunucu_surumu: SUNUCU_SURUMU,
-            hizmetler,
+            hizmetler: vec![],
+            uygulamalar: vec![],
+            ozel_protokoller: vec![],
         };
-
-        let json = serde_json::to_value(mesaj).expect("mesaj serialize edilmeli");
-        let hizmetler = json["hizmetler"].as_array().expect("hizmetler dizi olmalı");
-
-        assert_eq!(hizmetler.len(), 10);
-        assert_eq!(hizmetler[5]["hizmetKimligi"], VERI_MEDYAN_HESAPLA);
-        assert_eq!(hizmetler[9]["hizmetKimligi"], METIN_FREKANS_ANALIZI);
+        let json = serde_json::to_value(mesaj).expect("tanıtım serileştirilmeli");
+        assert!(json.get("uygulamalar").is_some());
+        assert!(json.get("ozelProtokoller").is_some());
+        assert_eq!(json["sunucuSurumu"], "0.7.0");
     }
 }
