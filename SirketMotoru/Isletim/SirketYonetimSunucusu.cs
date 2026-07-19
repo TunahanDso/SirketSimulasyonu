@@ -19,9 +19,10 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
     };
 
     private readonly MotorAyarlari _ayarlar;
-    private readonly SirketIsletimYoneticisi _isletim;
+    private readonly KodTabanliSirketIsletimYoneticisi _isletim;
     private readonly ConcurrentDictionary<string, OturumKaydi> _oturumlar =
         new(StringComparer.Ordinal);
+
     private TcpListener? _dinleyici;
     private CancellationTokenSource? _iptal;
     private Task? _gorev;
@@ -30,7 +31,7 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
 
     public SirketYonetimSunucusu(
         MotorAyarlari ayarlar,
-        SirketIsletimYoneticisi isletim)
+        KodTabanliSirketIsletimYoneticisi isletim)
     {
         _ayarlar = ayarlar ?? throw new ArgumentNullException(nameof(ayarlar));
         _isletim = isletim ?? throw new ArgumentNullException(nameof(isletim));
@@ -38,7 +39,11 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
 
     public Task BaslatAsync(CancellationToken cancellationToken)
     {
-        if (_baslatildi) return Task.CompletedTask;
+        if (_baslatildi)
+        {
+            return Task.CompletedTask;
+        }
+
         _baslatildi = true;
 
         if (!_ayarlar.SirketYonetimAktif)
@@ -47,13 +52,18 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
             return Task.CompletedTask;
         }
 
-        _iptal = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _dinleyici = new TcpListener(IPAddress.Any, _ayarlar.SirketYonetimPortu);
+        _iptal = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken);
+        _dinleyici = new TcpListener(
+            IPAddress.Any,
+            _ayarlar.SirketYonetimPortu);
         _dinleyici.Start(128);
         _gorev = KabulDongusuAsync(_iptal.Token);
 
         KonsolKayitcisi.Basari(
-            $"Şirket yönetim kapısı yayında | Port: {_ayarlar.SirketYonetimPortu}");
+            $"Şirket yönetim kapısı yayında | " +
+            $"Port: {_ayarlar.SirketYonetimPortu} | " +
+            "Rol: izleme, finans ve koddan ilan edilen yayınları yönetme");
 
         foreach (string adres in YayinAdresleri())
         {
@@ -63,16 +73,20 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    private async Task KabulDongusuAsync(CancellationToken cancellationToken)
+    private async Task KabulDongusuAsync(
+        CancellationToken cancellationToken)
     {
-        if (_dinleyici is null) return;
+        if (_dinleyici is null)
+        {
+            return;
+        }
 
         while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
-                TcpClient istemci =
-                    await _dinleyici.AcceptTcpClientAsync(cancellationToken);
+                TcpClient istemci = await _dinleyici.AcceptTcpClientAsync(
+                    cancellationToken);
                 _ = IstemciyiYonetAsync(istemci, cancellationToken);
             }
             catch (OperationCanceledException)
@@ -88,7 +102,8 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
             catch (Exception exception)
             {
                 KonsolKayitcisi.Uyari(
-                    $"Şirket yönetim istemci kabul hatası: {exception.Message}");
+                    $"Şirket yönetim istemci kabul hatası: " +
+                    exception.Message);
 
                 try
                 {
@@ -113,7 +128,9 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
             try
             {
                 await using NetworkStream akis = istemci.GetStream();
-                HttpIstegi? istek = await IstekOkuAsync(akis, cancellationToken);
+                HttpIstegi? istek = await IstekOkuAsync(
+                    akis,
+                    cancellationToken);
 
                 if (istek is null)
                 {
@@ -169,7 +186,8 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
                 {
                     durum = "calisiyor",
                     port = _ayarlar.SirketYonetimPortu,
-                    aktifOturum = _oturumlar.Count
+                    aktifOturum = _oturumlar.Count,
+                    rol = "koddan-ilan-edilen-yayinlari-yonetir"
                 },
                 null,
                 cancellationToken);
@@ -191,8 +209,9 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
                 return;
             }
 
-            IslemSonucu sonuc =
-                await _isletim.GirisDogrulaAsync(giris, cancellationToken);
+            IslemSonucu sonuc = await _isletim.GirisDogrulaAsync(
+                giris,
+                cancellationToken);
 
             if (!sonuc.Basarili)
             {
@@ -206,7 +225,6 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
             }
 
             string sirketKimligi = SirketKimliginiOku(sonuc.Veri);
-
             if (string.IsNullOrWhiteSpace(sirketKimligi))
             {
                 await JsonCevabiAsync(
@@ -230,22 +248,20 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
                         1_440))
             };
 
-            string cookie =
-                $"sirketOturumu={token}; Path=/; HttpOnly; SameSite=Strict";
             await JsonCevabiAsync(
                 akis,
                 200,
                 sonuc,
                 new Dictionary<string, string>
                 {
-                    ["Set-Cookie"] = cookie
+                    ["Set-Cookie"] =
+                        $"sirketOturumu={token}; Path=/; HttpOnly; SameSite=Strict"
                 },
                 cancellationToken);
             return;
         }
 
         OturumKaydi? oturum = OturumuGetir(istek.Basliklar);
-
         if (oturum is null)
         {
             await JsonCevabiAsync(
@@ -262,7 +278,10 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
         }
 
         oturum.SonKullanmaZamani = DateTimeOffset.UtcNow.AddMinutes(
-            Math.Clamp(_ayarlar.SirketYonetimOturumDakika, 10, 1_440));
+            Math.Clamp(
+                _ayarlar.SirketYonetimOturumDakika,
+                10,
+                1_440));
 
         if (istek.Metot == "POST" && yol == "/api/cikis")
         {
@@ -301,8 +320,6 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
             return;
         }
 
-        IslemSonucu islemSonucu;
-
         if (istek.Metot != "POST")
         {
             await MetinCevabiAsync(
@@ -314,121 +331,117 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
             return;
         }
 
-        switch (yol)
+        IslemSonucu islemSonucu = yol switch
         {
-            case "/api/parola":
-                islemSonucu =
-                    await CalistirAsync<ParolaDegistirIstegi>(
-                        istek,
-                        dto => _isletim.ParolaDegistirAsync(
-                            oturum.SirketKimligi,
-                            dto,
-                            cancellationToken));
-                break;
+            "/api/parola" =>
+                await CalistirAsync<ParolaDegistirIstegi>(
+                    istek,
+                    dto => _isletim.ParolaDegistirAsync(
+                        oturum.SirketKimligi,
+                        dto,
+                        cancellationToken)),
 
-            case "/api/yatirim":
-                islemSonucu =
-                    await CalistirAsync<YatirimIstegi>(
-                        istek,
-                        dto => _isletim.YatirimSatinAlAsync(
-                            oturum.SirketKimligi,
-                            dto,
-                            cancellationToken));
-                break;
+            "/api/yatirim" =>
+                await CalistirAsync<YatirimIstegi>(
+                    istek,
+                    dto => _isletim.YatirimSatinAlAsync(
+                        oturum.SirketKimligi,
+                        dto,
+                        cancellationToken)),
 
-            case "/api/fiyat":
-                islemSonucu =
-                    await CalistirAsync<FiyatGuncelleIstegi>(
-                        istek,
-                        dto => _isletim.HizmetFiyatiGuncelleAsync(
-                            oturum.SirketKimligi,
-                            dto,
-                            cancellationToken));
-                break;
+            "/api/kredi" =>
+                await CalistirAsync<KrediIstegi>(
+                    istek,
+                    dto => _isletim.KrediCekAsync(
+                        oturum.SirketKimligi,
+                        dto,
+                        cancellationToken)),
 
-            case "/api/kredi":
-                islemSonucu =
-                    await CalistirAsync<KrediIstegi>(
-                        istek,
-                        dto => _isletim.KrediCekAsync(
-                            oturum.SirketKimligi,
-                            dto,
-                            cancellationToken));
-                break;
+            "/api/hizmet/fiyat" =>
+                await CalistirAsync<FiyatGuncelleIstegi>(
+                    istek,
+                    dto => _isletim.HizmetFiyatiGuncelleAsync(
+                        oturum.SirketKimligi,
+                        dto,
+                        cancellationToken)),
 
-            case "/api/urun/olustur":
-                islemSonucu =
-                    await CalistirAsync<UrunOlusturIstegi>(
-                        istek,
-                        dto => _isletim.UrunOlusturAsync(
-                            oturum.SirketKimligi,
-                            dto,
-                            cancellationToken));
-                break;
+            "/api/hizmet/durum" =>
+                await CalistirAsync<HizmetYayinDurumuIstegi>(
+                    istek,
+                    dto => _isletim.HizmetYayinDurumuGuncelleAsync(
+                        oturum.SirketKimligi,
+                        dto,
+                        cancellationToken)),
 
-            case "/api/urun/guncelle":
-                islemSonucu =
-                    await CalistirAsync<UrunGuncelleIstegi>(
-                        istek,
-                        dto => _isletim.UrunGuncelleAsync(
-                            oturum.SirketKimligi,
-                            dto,
-                            cancellationToken));
-                break;
+            "/api/uygulama/yayinla" =>
+                await CalistirAsync<UygulamaYayinlaIstegi>(
+                    istek,
+                    dto => _isletim.UygulamaYayinlaAsync(
+                        oturum.SirketKimligi,
+                        dto,
+                        cancellationToken)),
 
-            case "/api/urun/kapasite":
-                islemSonucu =
-                    await CalistirAsync<UrunKapasiteIstegi>(
-                        istek,
-                        dto => _isletim.UrunKapasitesiArtirAsync(
-                            oturum.SirketKimligi,
-                            dto,
-                            cancellationToken));
-                break;
+            "/api/uygulama/guncelle" =>
+                await CalistirAsync<UrunGuncelleIstegi>(
+                    istek,
+                    dto => _isletim.UygulamaGuncelleAsync(
+                        oturum.SirketKimligi,
+                        dto,
+                        cancellationToken)),
 
-            case "/api/protokol/olustur":
-                islemSonucu =
-                    await CalistirAsync<ProtokolOlusturIstegi>(
-                        istek,
-                        dto => _isletim.ProtokolOlusturAsync(
-                            oturum.SirketKimligi,
-                            dto,
-                            cancellationToken));
-                break;
+            "/api/uygulama/kapasite" =>
+                await CalistirAsync<UrunKapasiteIstegi>(
+                    istek,
+                    dto => _isletim.UygulamaKapasitesiArtirAsync(
+                        oturum.SirketKimligi,
+                        dto,
+                        cancellationToken)),
 
-            case "/api/protokol/benimse":
-                islemSonucu =
-                    await CalistirAsync<ProtokolBenimseIstegi>(
-                        istek,
-                        dto => _isletim.ProtokolBenimseAsync(
-                            oturum.SirketKimligi,
-                            dto,
-                            cancellationToken));
-                break;
+            "/api/protokol/yayinla" =>
+                await CalistirAsync<ProtokolYayinlaIstegi>(
+                    istek,
+                    dto => _isletim.ProtokolYayinlaAsync(
+                        oturum.SirketKimligi,
+                        dto,
+                        cancellationToken)),
 
-            case "/api/sozlesme/kabul":
-                islemSonucu =
-                    await CalistirAsync<SozlesmeKabulIstegi>(
-                        istek,
-                        dto => _isletim.SozlesmeKabulEtAsync(
-                            oturum.SirketKimligi,
-                            dto,
-                            cancellationToken));
-                break;
+            "/api/protokol/benimse" =>
+                await CalistirAsync<ProtokolBenimseIstegi>(
+                    istek,
+                    dto => _isletim.ProtokolBenimseAsync(
+                        oturum.SirketKimligi,
+                        dto,
+                        cancellationToken)),
 
-            default:
-                await MetinCevabiAsync(
-                    akis,
-                    404,
-                    "Not Found",
-                    "Uç nokta bulunamadı.",
-                    cancellationToken);
-                return;
-        }
+            "/api/sozlesme/kabul" =>
+                await CalistirAsync<SozlesmeKabulIstegi>(
+                    istek,
+                    dto => _isletim.SozlesmeKabulEtAsync(
+                        oturum.SirketKimligi,
+                        dto,
+                        cancellationToken)),
+
+            _ => IslemSonucu.Hata("Uç nokta bulunamadı.")
+        };
+
+        int durumKodu = yol is
+            "/api/parola" or
+            "/api/yatirim" or
+            "/api/kredi" or
+            "/api/hizmet/fiyat" or
+            "/api/hizmet/durum" or
+            "/api/uygulama/yayinla" or
+            "/api/uygulama/guncelle" or
+            "/api/uygulama/kapasite" or
+            "/api/protokol/yayinla" or
+            "/api/protokol/benimse" or
+            "/api/sozlesme/kabul"
+                ? (islemSonucu.Basarili ? 200 : 400)
+                : 404;
 
         await JsonCevabiAsync(
             akis,
-            islemSonucu.Basarili ? 200 : 400,
+            durumKodu,
             islemSonucu,
             null,
             cancellationToken);
@@ -440,7 +453,6 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
         where T : class
     {
         T? dto = JsonOku<T>(istek.Govde);
-
         if (dto is null)
         {
             return IslemSonucu.Hata("İstek JSON'u geçersiz.");
@@ -481,12 +493,8 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
         foreach (string parca in cookie.Split(';'))
         {
             string[] cift = parca.Trim().Split('=', 2);
-
             if (cift.Length == 2 &&
-                string.Equals(
-                    cift[0],
-                    ad,
-                    StringComparison.Ordinal))
+                string.Equals(cift[0], ad, StringComparison.Ordinal))
             {
                 return cift[1];
             }
@@ -497,7 +505,10 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
 
     private static string SirketKimliginiOku(object? veri)
     {
-        if (veri is null) return string.Empty;
+        if (veri is null)
+        {
+            return string.Empty;
+        }
 
         try
         {
@@ -519,7 +530,10 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
     private static T? JsonOku<T>(string json)
         where T : class
     {
-        if (string.IsNullOrWhiteSpace(json)) return null;
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
 
         try
         {
@@ -544,32 +558,48 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
         while (ham.Length < azamiBaslik)
         {
             int okunan = await akis.ReadAsync(tampon, cancellationToken);
-            if (okunan == 0) return null;
+            if (okunan == 0)
+            {
+                return null;
+            }
+
             ham.Write(tampon, 0, okunan);
             byte[] mevcut = ham.GetBuffer();
             baslikSonu = BaslikSonunuBul(mevcut, (int)ham.Length);
-            if (baslikSonu >= 0) break;
+            if (baslikSonu >= 0)
+            {
+                break;
+            }
         }
 
-        if (baslikSonu < 0) return null;
+        if (baslikSonu < 0)
+        {
+            return null;
+        }
 
         byte[] tum = ham.ToArray();
-        string baslikMetni =
-            Encoding.ASCII.GetString(tum, 0, baslikSonu);
-        string[] satirlar =
-            baslikMetni.Split(
-                "\r\n",
-                StringSplitOptions.None);
+        string baslikMetni = Encoding.ASCII.GetString(
+            tum,
+            0,
+            baslikSonu);
+        string[] satirlar = baslikMetni.Split(
+            "\r\n",
+            StringSplitOptions.None);
 
-        if (satirlar.Length == 0) return null;
+        if (satirlar.Length == 0)
+        {
+            return null;
+        }
 
-        string[] ilk =
-            satirlar[0].Split(
-                ' ',
-                3,
-                StringSplitOptions.RemoveEmptyEntries);
+        string[] ilk = satirlar[0].Split(
+            ' ',
+            3,
+            StringSplitOptions.RemoveEmptyEntries);
 
-        if (ilk.Length != 3) return null;
+        if (ilk.Length != 3)
+        {
+            return null;
+        }
 
         Dictionary<string, string> basliklar =
             new(StringComparer.OrdinalIgnoreCase);
@@ -577,13 +607,16 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
         foreach (string satir in satirlar.Skip(1))
         {
             int ikiNokta = satir.IndexOf(':');
-            if (ikiNokta <= 0) continue;
+            if (ikiNokta <= 0)
+            {
+                continue;
+            }
+
             basliklar[satir[..ikiNokta].Trim().ToLowerInvariant()] =
                 satir[(ikiNokta + 1)..].Trim();
         }
 
         int icerikUzunlugu = 0;
-
         if (basliklar.TryGetValue(
                 "content-length",
                 out string? uzunlukMetni) &&
@@ -607,16 +640,18 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
 
         while (govde.Length < icerikUzunlugu)
         {
-            int kalan =
-                Math.Min(
-                    tampon.Length,
-                    icerikUzunlugu - (int)govde.Length);
-            int okunan =
-                await akis.ReadAsync(
-                    tampon.AsMemory(0, kalan),
-                    cancellationToken);
+            int kalan = Math.Min(
+                tampon.Length,
+                icerikUzunlugu - (int)govde.Length);
+            int okunan = await akis.ReadAsync(
+                tampon.AsMemory(0, kalan),
+                cancellationToken);
 
-            if (okunan == 0) return null;
+            if (okunan == 0)
+            {
+                return null;
+            }
+
             govde.Write(tampon, 0, okunan);
         }
 
@@ -629,9 +664,7 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
         };
     }
 
-    private static int BaslikSonunuBul(
-        byte[] veri,
-        int uzunluk)
+    private static int BaslikSonunuBul(byte[] veri, int uzunluk)
     {
         for (int i = 0; i <= uzunluk - 4; i++)
         {
@@ -719,8 +752,8 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
         }
 
         baslik.Append("\r\n");
-        byte[] baslikBaytlari =
-            Encoding.ASCII.GetBytes(baslik.ToString());
+        byte[] baslikBaytlari = Encoding.ASCII.GetBytes(
+            baslik.ToString());
 
         await akis.WriteAsync(baslikBaytlari, cancellationToken);
         await akis.WriteAsync(govdeBaytlari, cancellationToken);
@@ -746,9 +779,13 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
                 $"http://localhost:{_ayarlar.SirketYonetimPortu}/"
             };
 
-        foreach (NetworkInterface ag in NetworkInterface.GetAllNetworkInterfaces())
+        foreach (NetworkInterface ag in
+                 NetworkInterface.GetAllNetworkInterfaces())
         {
-            if (ag.OperationalStatus != OperationalStatus.Up) continue;
+            if (ag.OperationalStatus != OperationalStatus.Up)
+            {
+                continue;
+            }
 
             foreach (UnicastIPAddressInformation adres in
                      ag.GetIPProperties().UnicastAddresses)
@@ -757,17 +794,22 @@ public sealed class SirketYonetimSunucusu : IAsyncDisposable
                     AddressFamily.InterNetwork)
                 {
                     adresler.Add(
-                        $"http://{adres.Address}:{_ayarlar.SirketYonetimPortu}/");
+                        $"http://{adres.Address}:" +
+                        $"{_ayarlar.SirketYonetimPortu}/");
                 }
             }
         }
 
-        return adresler.OrderBy(a => a);
+        return adresler.OrderBy(adres => adres);
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
+        if (_disposed)
+        {
+            return;
+        }
+
         _disposed = true;
 
         try
