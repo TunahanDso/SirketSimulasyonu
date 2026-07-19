@@ -1,1 +1,85 @@
-__PLACEHOLDER__
+{
+  "katalogSurumu": "2.0",
+  "hizmetler": [
+    {
+      "hizmetKimligi": "matematik.topla",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Gönderilen sayıların toplamını hesaplar.",
+      "zamanAsimiMs": 2000,
+      "azamiIstekBoyutuByte": 8192,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "matematik.carp",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Gönderilen sayıların çarpımını hesaplar.",
+      "zamanAsimiMs": 2000,
+      "azamiIstekBoyutuByte": 8192,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "veri.ortalama-hesapla",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Gönderilen sayıların aritmetik ortalamasını hesaplar.",
+      "zamanAsimiMs": 2000,
+      "azamiIstekBoyutuByte": 16384,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "metin.kelime-say",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Gönderilen metindeki kelime sayısını hesaplar.",
+      "zamanAsimiMs": 2000,
+      "azamiIstekBoyutuByte": 32768,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "metin.karakter-say",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Gönderilen metindeki UTF-16 karakter birimi sayısını hesaplar.",
+      "zamanAsimiMs": 2000,
+      "azamiIstekBoyutuByte": 32768,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "veri.medyan-hesapla",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Sayı dizisini işleyerek medyan değerini hesaplar.",
+      "zamanAsimiMs": 2500,
+      "azamiIstekBoyutuByte": 32768,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "veri.standart-sapma",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Sayı dizisinin popülasyon standart sapmasını hesaplar.",
+      "zamanAsimiMs": 3000,
+      "azamiIstekBoyutuByte": 32768,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "dizi.sirala",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Sayı dizisini artan veya azalan yönde kararlı biçimde sıralar.",
+      "zamanAsimiMs": 3000,
+      "azamiIstekBoyutuByte": 49152,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "matematik.asal-carpanlar",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Pozitif tam sayıyı tekrarlı asal çarpanlarına ayırır.",
+      "zamanAsimiMs": 3500,
+      "azamiIstekBoyutuByte": 4096,
+      "aktif": true
+    },
+    {
+      "hizmetKimligi": "metin.frekans-analizi",
+      "hizmetSurumu": "1.0",
+      "aciklama": "Metindeki kelimeleri küçük harfe dönüştürerek frekans haritası üretir.",
+      "zamanAsimiMs": 3500,
+      "azamiIstekBoyutuByte": 49152,
+      "aktif": true
+    }
+  ]
+}
