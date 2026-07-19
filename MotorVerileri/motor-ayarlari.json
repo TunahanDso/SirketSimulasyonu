@@ -1,10 +1,13 @@
-﻿{
+{
   "motorKimligi": "ana-motor",
   "protokolSurumu": "0.1",
   "tickSuresiSaniye": 10,
   "baglantiZamanAsimiMs": 3000,
   "mesajZamanAsimiMs": 3000,
   "azamiMesajBoyutuByte": 65536,
+  "canliPanoAktif": true,
+  "canliPanoPortu": 8080,
+  "canliPanoYenilemeMs": 1000,
   "sirketler": [
     {
       "sirketKimligi": "tunahan-tunix",
