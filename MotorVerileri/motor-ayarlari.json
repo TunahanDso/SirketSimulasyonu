@@ -8,6 +8,9 @@
   "canliPanoAktif": true,
   "canliPanoPortu": 8080,
   "canliPanoYenilemeMs": 1000,
+  "sirketYonetimAktif": true,
+  "sirketYonetimPortu": 8090,
+  "sirketYonetimOturumDakika": 180,
   "sirketler": [
     {
       "sirketKimligi": "tunahan-tunix",
