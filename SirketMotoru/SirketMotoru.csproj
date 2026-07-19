@@ -8,13 +8,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Nihai V8 sınıfları aynı adları kullanır; eski ve ara sürümler derlenmez. -->
+    <!-- Nihai V8.2 sınıfları aynı adları kullanır; eski ve ara sürümler derlenmez. -->
     <Compile Remove="CanliPano/YazilimBorsasiHtml.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV2.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV3.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV4.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV5.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV6.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV7.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusu.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusuV2.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusuV3.cs" />
@@ -25,18 +26,22 @@
     <Compile Remove="Isletim/SirketYonetimHtmlV4.cs" />
     <Compile Remove="Isletim/SirketYonetimHtmlV5.cs" />
     <Compile Remove="Isletim/SirketYonetimHtmlV6.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV7.cs" />
 
     <Compile Remove="Isletim/SirketYonetimSunucusu.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusuV2.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusuV3.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusuV4.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusuV5.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusuV6.cs" />
     <Compile Remove="Isletim/SirketIsletimYoneticisi.cs" />
     <Compile Remove="Isletim/KodTabanliSirketIsletimYoneticisi.cs" />
 
     <Compile Remove="Isler/IsYoneticisi.cs" />
+    <Compile Remove="Isler/IsYoneticisiV2.cs" />
     <Compile Remove="Tick/TickYoneticisi.cs" />
     <Compile Remove="Tick/TickYoneticisiV2.cs" />
+    <Compile Remove="Tick/TickYoneticisiV3.cs" />
     <Compile Remove="Musteriler/MusteriYoneticisi.cs" />
   </ItemGroup>
 
