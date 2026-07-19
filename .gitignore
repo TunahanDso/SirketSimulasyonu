@@ -23,3 +23,8 @@ Desktop.ini
 
 # Logs
 *.log
+
+# Motor çalışma verileri
+MotorVerileri/musteriler.json
+MotorVerileri/sirket-bilancolari.json
+MotorVerileri/sirket-bilancolari.json.tmp
