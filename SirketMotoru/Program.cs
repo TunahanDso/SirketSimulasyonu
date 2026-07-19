@@ -65,6 +65,12 @@ try
         motorVerileriKlasoru);
     await ekonomiV6Yoneticisi.BaslatAsync(iptalKaynagi.Token);
 
+    await using FinansV7Yoneticisi finansV7Yoneticisi = new(
+        sirketYoneticisi,
+        isletimYoneticisi,
+        motorVerileriKlasoru);
+    await finansV7Yoneticisi.BaslatAsync(iptalKaynagi.Token);
+
     await BaslangicMigrasyonlari.TekSeferlikFinansmanDestekleriniUygulaAsync(sirketYoneticisi, motorVerileriKlasoru, iptalKaynagi.Token);
 
     TickYoneticisi tickYoneticisi = new(
@@ -76,7 +82,8 @@ try
         ekosistemYoneticisi,
         pazarFiyatYoneticisi,
         pazarGelirDuzeltmeYoneticisi,
-        ekonomiV6Yoneticisi);
+        ekonomiV6Yoneticisi,
+        finansV7Yoneticisi);
 
     await using YazilimBorsasiSunucusu yazilimBorsasiSunucusu = new(
         motorAyarlari,
@@ -84,12 +91,14 @@ try
         musteriYoneticisi,
         hizmetKatalogu,
         isletimYoneticisi,
+        finansV7Yoneticisi,
         () => tickYoneticisi.TickNumarasi);
 
     await using SirketYonetimSunucusu sirketYonetimSunucusu = new(
         motorAyarlari,
         isletimYoneticisi,
-        ekosistemYoneticisi);
+        ekosistemYoneticisi,
+        finansV7Yoneticisi);
 
     await yazilimBorsasiSunucusu.BaslatAsync(iptalKaynagi.Token);
     await sirketYonetimSunucusu.BaslatAsync(iptalKaynagi.Token);
