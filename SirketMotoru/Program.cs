@@ -50,16 +50,14 @@ try
         $"Motor ayarları yüklendi. Şirket sayısı: " +
         $"{motorAyarlari.Sirketler.Count}");
 
-    string katalogDosyasiYolu =
-        Path.Combine(motorVerileriKlasoru, "hizmet-katalogu.json");
+    string katalogDosyasiYolu = Path.Combine(
+        motorVerileriKlasoru,
+        "hizmet-katalogu.json");
 
     if (!File.Exists(katalogDosyasiYolu))
     {
         katalogDosyasiYolu = VeriDosyasiniBul("hizmet-katalogu.json");
     }
-
-    KonsolKayitcisi.Bilgi(
-        $"Hizmet kataloğu bulundu: {katalogDosyasiYolu}");
 
     HizmetKatalogAyarlari katalogAyarlari =
         await JsonDosyasiniOkuAsync<HizmetKatalogAyarlari>(
@@ -67,13 +65,13 @@ try
             jsonAyarlari,
             iptalKaynagi.Token);
     HizmetKatalogu hizmetKatalogu = new(katalogAyarlari);
-    int aktifHizmetSayisi =
-        hizmetKatalogu.Hizmetler.Count(hizmet => hizmet.Aktif);
+    int aktifHizmetSayisi = hizmetKatalogu.Hizmetler.Count(
+        hizmet => hizmet.Aktif);
 
     KonsolKayitcisi.Basari(
         $"Hizmet kataloğu yüklendi. Katalog sürümü: " +
-        $"{hizmetKatalogu.KatalogSurumu} | Aktif hizmet sayısı: " +
-        $"{aktifHizmetSayisi}");
+        $"{hizmetKatalogu.KatalogSurumu} | " +
+        $"Aktif hizmet sayısı: {aktifHizmetSayisi}");
 
     foreach (HizmetTanimi hizmet in
              hizmetKatalogu.Hizmetler
@@ -86,10 +84,9 @@ try
             $"Hizmet: {hizmet.HizmetKimligi}@{hizmet.HizmetSurumu}");
     }
 
-    string musteriDosyasiYolu =
-        Path.Combine(motorVerileriKlasoru, "musteriler.json");
-    KonsolKayitcisi.Bilgi(
-        $"Müşteri veritabanı yolu: {musteriDosyasiYolu}");
+    string musteriDosyasiYolu = Path.Combine(
+        motorVerileriKlasoru,
+        "musteriler.json");
 
     MusteriVeritabani musteriVeritabani = new(musteriDosyasiYolu);
     await using MusteriYoneticisi musteriYoneticisi =
@@ -98,35 +95,34 @@ try
 
     KonsolKayitcisi.Basari(
         $"Müşteri sistemi hazır. Toplam müşteri: " +
-        $"{musteriYoneticisi.Musteriler.Count} | Aktif müşteri: " +
-        $"{musteriYoneticisi.AktifMusteriSayisi} | " +
+        $"{musteriYoneticisi.Musteriler.Count} | " +
+        $"Aktif müşteri: {musteriYoneticisi.AktifMusteriSayisi} | " +
         $"Toplam müşteri bakiyesi: " +
         $"{musteriYoneticisi.ToplamMusteriBakiyesi:N2}");
 
     await using SirketYoneticisi sirketYoneticisi =
         new(motorAyarlari, hizmetKatalogu);
 
-    await using SirketIsletimYoneticisi sirketIsletimYoneticisi =
+    await using KodTabanliSirketIsletimYoneticisi isletimYoneticisi =
         new(sirketYoneticisi, motorVerileriKlasoru);
-    await sirketIsletimYoneticisi.BaslatAsync(iptalKaynagi.Token);
+    await isletimYoneticisi.BaslatAsync(iptalKaynagi.Token);
 
-    TickYoneticisi tickYoneticisi =
-        new(
-            motorAyarlari,
-            sirketYoneticisi,
-            musteriYoneticisi,
-            sirketIsletimYoneticisi);
+    TickYoneticisi tickYoneticisi = new(
+        motorAyarlari,
+        sirketYoneticisi,
+        musteriYoneticisi,
+        isletimYoneticisi);
 
-    await using CanliPanoSunucusu canliPanoSunucusu =
-        new(
-            motorAyarlari,
-            sirketYoneticisi,
-            musteriYoneticisi,
-            hizmetKatalogu,
-            () => tickYoneticisi.TickNumarasi);
+    await using CanliPanoSunucusu canliPanoSunucusu = new(
+        motorAyarlari,
+        sirketYoneticisi,
+        musteriYoneticisi,
+        hizmetKatalogu,
+        () => tickYoneticisi.TickNumarasi);
 
-    await using SirketYonetimSunucusu sirketYonetimSunucusu =
-        new(motorAyarlari, sirketIsletimYoneticisi);
+    await using SirketYonetimSunucusu sirketYonetimSunucusu = new(
+        motorAyarlari,
+        isletimYoneticisi);
 
     await canliPanoSunucusu.BaslatAsync(iptalKaynagi.Token);
     await sirketYonetimSunucusu.BaslatAsync(iptalKaynagi.Token);
@@ -154,7 +150,8 @@ catch (JsonException exception)
 catch (InvalidOperationException exception)
 {
     KonsolKayitcisi.Hata(
-        $"Motor yapılandırması veya durumu geçersiz: {exception.Message}");
+        $"Motor yapılandırması veya durumu geçersiz: " +
+        exception.Message);
     KonsolKayitcisi.Hata(exception.ToString());
     Environment.ExitCode = 1;
 }
@@ -189,8 +186,9 @@ static async Task<T> JsonDosyasiniOkuAsync<T>(
             dosyaYolu);
     }
 
-    string json =
-        await File.ReadAllTextAsync(dosyaYolu, cancellationToken);
+    string json = await File.ReadAllTextAsync(
+        dosyaYolu,
+        cancellationToken);
 
     if (string.IsNullOrWhiteSpace(json))
     {
@@ -199,14 +197,8 @@ static async Task<T> JsonDosyasiniOkuAsync<T>(
     }
 
     T? veri = JsonSerializer.Deserialize<T>(json, jsonAyarlari);
-
-    if (veri is null)
-    {
-        throw new InvalidOperationException(
-            $"{Path.GetFileName(dosyaYolu)} dosyası okunamadı.");
-    }
-
-    return veri;
+    return veri ?? throw new InvalidOperationException(
+        $"{Path.GetFileName(dosyaYolu)} dosyası okunamadı.");
 }
 
 static string VeriDosyasiniBul(string dosyaAdi)
@@ -258,7 +250,10 @@ static string VeriDosyasiniBul(string dosyaAdi)
     foreach (string yol in olasiYollar)
     {
         string tamYol = Path.GetFullPath(yol);
-        if (File.Exists(tamYol)) return tamYol;
+        if (File.Exists(tamYol))
+        {
+            return tamYol;
+        }
     }
 
     string arananYollar = string.Join(
