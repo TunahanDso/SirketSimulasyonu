@@ -17,10 +17,10 @@ Repo kökünden:
 ```powershell
 cd .\Sirketler\Ilayda-Python\IlosTech
 python -m unittest -v
-python .\server.py
+python .\start.py
 ```
 
-veya:
+veya test ve sunucuyu tek komutla çalıştırmak için:
 
 ```powershell
 .\run.ps1
@@ -42,6 +42,20 @@ Sunucu ham TCP, UTF-8 ve satır sonlandırmalı JSON kullanır. Her bağlantı a
 - NaN/sonsuz sayı reddi
 - bağlantı hatasının ana sunucuyu kapatmaması
 - gerçek işlem süresi
+
+## Başlangıç profili
+
+İlos Tech yalnız ilk kalıcı bilanço oluşturulurken kaliteli bir başlangıç profili alır:
+
+- Başlangıç kasası: 40.000 TL
+- Kod kalitesi: 84
+- Performans: 82
+- Güvenlik: 88
+- Güvenilirlik: 80
+- İtibar: 72
+- Müşteri memnuniyeti: 76
+
+Bu değerler kalıcı bilanço oluştuktan sonra yeniden uygulanmaz. Şirketin sonraki puanları gerçek iş sonuçları, hız, saldırı savunması ve müşteri davranışlarıyla değişir.
 
 ## Temel hizmet fiyatları
 
@@ -119,4 +133,4 @@ Sunucu çalışınca İSosyal, İMail ve İLink teknik manifestleri motora gider
 4. Protokoller bölümünde İLink’i yayınlayın.
 5. Gerektikçe kullanıcı kapasitesi ve altyapı satın alın.
 
-8090 kod üretmez; burada bulunan bütün özelliklerin gerçek kodu `server.py` içindedir.
+8090 kod üretmez; burada bulunan bütün özelliklerin gerçek kodu `server.py` içindedir. `start.py`, yalnız sunucuyu güvenli biçimde başlatıp kapatır.
