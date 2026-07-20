@@ -9,7 +9,7 @@ using SirketMotoru.Sirketler;
 using SirketMotoru.Tick;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
-KonsolKayitcisi.Bilgi("Üç Kardeş Yazılım Şirketi Simülasyonu V9 başlatılıyor.");
+KonsolKayitcisi.Bilgi("Üç Kardeş Yazılım Şirketi Simülasyonu V9.2 başlatılıyor.");
 using CancellationTokenSource iptalKaynagi = new();
 Console.CancelKeyPress += (_, e) =>
 {
@@ -32,8 +32,8 @@ try
         iptalKaynagi.Token);
     MotorAyarlariDogrulayicisi.Dogrula(ayarlar);
 
-    // Bütün eski bilanço, borç, destek, müşteri tercihi ve pazar dosyaları
-    // yöneticiler kurulmadan önce bir defa arşivlenip temizlenir.
+    // V9.2 son temiz sezon: şirket kodları ve manifestler korunur; motor çalışma
+    // verileri bir defa arşivlenip eşit başlangıçtan yeniden oluşturulur.
     await V9TamReset.UygulaAsync(motorVerileri, iptalKaynagi.Token);
 
     string katalogYolu = Path.Combine(motorVerileri, "hizmet-katalogu.json");
@@ -44,7 +44,7 @@ try
         iptalKaynagi.Token);
     HizmetKatalogu katalog = new(StandartKatalogV6.Genislet(tohum));
     KonsolKayitcisi.Basari(
-        $"V9 hizmet kataloğu hazır | Aktif hizmet: {katalog.Hizmetler.Count(x => x.Aktif):N0} | " +
+        $"V9.2 hizmet kataloğu hazır | Aktif hizmet: {katalog.Hizmetler.Count(x => x.Aktif):N0} | " +
         $"Kategori: {StandartKatalogV6.UygulamaKategorileri.Count:N0}");
 
     MusteriVeritabani musteriDb = new(Path.Combine(motorVerileri, "musteriler.json"));
@@ -63,7 +63,14 @@ try
     await using V9EkonomiYoneticisi v9 = new(sirketler, musteriler, katalog, isletim, motorVerileri);
     await v9.BaslatAsync(iptalKaynagi.Token);
 
-    TickYoneticisi tick = new(ayarlar, sirketler, musteriler, isletim, ekosistem, v9);
+    TickYoneticisi tick = new(
+        ayarlar,
+        sirketler,
+        musteriler,
+        isletim,
+        ekosistem,
+        v9,
+        motorVerileri);
 
     await using YazilimBorsasiSunucusu borsa = new(
         ayarlar,
@@ -90,8 +97,8 @@ try
         iptalKaynagi.Token);
 
     KonsolKayitcisi.Basari(
-        "V9 TEMİZ MOTOR HAZIR | Eşit başlangıç, sabit hizmet fiyatı, tek kapasite havuzu, " +
-        "trendli 20.000 müşteri pazarı, hafif gider ve otomatik kredisi olmayan ekonomi aktif.");
+        "V9.2 MOTOR HAZIR | Tek 2.500+ fiziksel kapasite havuzu, toplu hizmet tahsisi, " +
+        "çoklu protokol, ayrıntılı borsa, şaşaalı haberler ve kontrollü maliyet artışı aktif.");
     await tick.BaslatAsync(iptalKaynagi.Token);
 }
 catch (OperationCanceledException)
