@@ -17,6 +17,7 @@
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV6.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV7.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV8.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV9.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusu.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusuV2.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusuV3.cs" />
