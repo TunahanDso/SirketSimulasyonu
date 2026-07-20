@@ -1,3 +1,5 @@
+using SirketMotoru.Sirketler;
+
 namespace SirketMotoru.Isletim;
 
 public sealed class V93HizmetKapasiteAnligi
@@ -25,21 +27,32 @@ public static class V93HizmetKapasiteDeposu
     private static readonly Dictionary<string, V93HizmetKapasiteAnligi> Sirketler =
         new(StringComparer.OrdinalIgnoreCase);
 
-    public static void TickBaslat(long tickNumarasi)
+    public static void TickBaslat(long tickNumarasi, IEnumerable<SirketKaydi> sirketKayitlari)
     {
+        ArgumentNullException.ThrowIfNull(sirketKayitlari);
         lock (Kilit)
         {
             _tick = tickNumarasi;
             Sirketler.Clear();
             V9PazarDosyasi pazar = V9PazarDeposu.Getir();
+            Dictionary<string, SirketKaydi> kayitlar = sirketKayitlari
+                .ToDictionary(x => x.SirketKimligi, StringComparer.OrdinalIgnoreCase);
+
             foreach ((string sirketKimligi, V9SirketKapasiteDurumu kapasite) in pazar.SirketKapasiteleri)
             {
+                int havuz = Math.Max(0, kapasite.HizmetHavuzu);
                 Sirketler[sirketKimligi] = new V93HizmetKapasiteAnligi
                 {
                     SirketKimligi = sirketKimligi,
                     TickNumarasi = tickNumarasi,
-                    AyrilanHizmetHavuzu = Math.Max(0, kapasite.HizmetHavuzu)
+                    AyrilanHizmetHavuzu = havuz
                 };
+
+                // SirketKaydi.IsBaslat içindeki eski hizmet-başına eşzamanlı kontrol,
+                // V9.3 ortak havuzundan ayrı ikinci bir kapasite otoritesi olmasın.
+                if (!kayitlar.TryGetValue(sirketKimligi, out SirketKaydi? sirket)) continue;
+                foreach (var hizmet in sirket.Hizmetler)
+                    hizmet.AzamiEszamanliIs = hizmet.Aktif && havuz > 0 ? havuz : 0;
             }
         }
     }
