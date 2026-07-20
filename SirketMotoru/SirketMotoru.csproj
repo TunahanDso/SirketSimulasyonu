@@ -41,6 +41,7 @@
     <Compile Remove="Isletim/SirketYonetimSunucusuV6.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusuV7.cs" />
     <Compile Remove="Isletim/SirketIsletimYoneticisi.cs" />
+    <Compile Remove="Isletim/SirketIsletimYoneticisiV2.cs" />
     <Compile Remove="Isletim/KodTabanliSirketIsletimYoneticisi.cs" />
     <Compile Remove="Isletim/EkosistemYoneticisi.cs" />
     <Compile Remove="Isletim/V9EkonomiYoneticisi.cs" />
