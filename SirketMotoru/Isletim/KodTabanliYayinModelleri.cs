@@ -32,10 +32,28 @@ public sealed class UygulamaYayinlaIstegi
     public decimal AbonelikUcreti { get; set; }
     public decimal KullanimBasinaUcret { get; set; }
 
-    // V8.2: ürün tek düğmeyle oluşturulur ve aynı işlemde dağıtımı bağlanır.
+    // Ürün tek işlemde oluşturulur, fiyatlandırılır ve dağıtımı bağlanır.
     public string IsletimSistemiKimligi { get; set; } = string.Empty;
+
+    // Eski istemciler için geriye dönük uyumluluk alanı.
     public string BaglantiProtokoluKimligi { get; set; } = string.Empty;
+
+    // V9.2: işletim sistemleri ve uygulamalar birden fazla aktif protokol kabul edebilir.
+    public List<string> BaglantiProtokoluKimlikleri { get; set; } = [];
     public bool AktifOlmasiIsteniyor { get; set; } = true;
+
+    public IReadOnlyList<string> ProtokolleriGetir()
+    {
+        IEnumerable<string> kaynak = BaglantiProtokoluKimlikleri ?? [];
+        if (!string.IsNullOrWhiteSpace(BaglantiProtokoluKimligi))
+            kaynak = kaynak.Append(BaglantiProtokoluKimligi);
+        return kaynak
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+            .AsReadOnly();
+    }
 }
 
 public sealed class ProtokolYayinlaIstegi
