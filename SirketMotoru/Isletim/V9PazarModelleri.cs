@@ -5,7 +5,7 @@ namespace SirketMotoru.Isletim;
 
 public sealed class V9PazarDosyasi
 {
-    public int Surum { get; set; } = 92;
+    public int Surum { get; set; } = 93;
     public long SonTick { get; set; }
     public DateTimeOffset GuncellenmeZamani { get; set; } = DateTimeOffset.UtcNow;
     public Dictionary<string, V9TalepKaydi> HizmetTalepleri { get; set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -85,6 +85,9 @@ public sealed class V9SirketKapasiteDurumu
     public int ToplamFizikselKapasite { get; set; }
     public int AyrilmisKapasite { get; set; }
     public int KullanilanKapasite { get; set; }
+    public int HizmetKullanilanKapasite { get; set; }
+    public int UrunKullanilanKapasite { get; set; }
+    public int HizmetReddedilenIsSayisi { get; set; }
     public Dictionary<string, int> Tahsisler { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public bool KullaniciElleAyarladi { get; set; }
     public int HizmetHavuzu => Tahsisler
@@ -95,6 +98,8 @@ public sealed class V9SirketKapasiteDurumu
         .Sum(x => x.Value);
     public int BosKapasite => Math.Max(0, ToplamFizikselKapasite - AyrilmisKapasite);
     public double DolulukOrani => ToplamFizikselKapasite <= 0 ? 0 : Math.Clamp(KullanilanKapasite * 100d / ToplamFizikselKapasite, 0, 300);
+    public double HizmetDolulukOrani => HizmetHavuzu <= 0 ? 0 : Math.Clamp(HizmetKullanilanKapasite * 100d / HizmetHavuzu, 0, 300);
+    public double UrunDolulukOrani => UrunHavuzu <= 0 ? 0 : Math.Clamp(UrunKullanilanKapasite * 100d / UrunHavuzu, 0, 300);
 }
 
 public sealed class V9SirketPazarOzeti
@@ -114,6 +119,8 @@ public sealed class V9SirketPazarOzeti
     public int IsletimSistemiKullanicisi { get; set; }
     public int ToplamKapasite { get; set; }
     public int KullanilanKapasite { get; set; }
+    public int HizmetKullanilanKapasite { get; set; }
+    public int UrunKullanilanKapasite { get; set; }
     public decimal AktifBorc { get; set; }
 }
 
@@ -131,6 +138,16 @@ public sealed class V9HaberKaydi
     public string Rozet { get; set; } = "SON DAKİKA";
     public string Ikon { get; set; } = "📰";
     public DateTimeOffset Zaman { get; set; } = DateTimeOffset.UtcNow;
+
+    // Siber tehdit haritası için opsiyonel alanlar.
+    public string KaynakUlke { get; set; } = string.Empty;
+    public string KaynakBolge { get; set; } = string.Empty;
+    public double KaynakEnlem { get; set; }
+    public double KaynakBoylam { get; set; }
+    public double HedefEnlem { get; set; }
+    public double HedefBoylam { get; set; }
+    public string SaldiriTuru { get; set; } = string.Empty;
+    public bool? Engellendi { get; set; }
 }
 
 public sealed class V9KapasiteTahsisIstegi
@@ -146,17 +163,17 @@ public static class V9FiyatPolitikasi
     {
         string tur = Normal(urunTuru);
         string kat = Normal(kategori);
-        if (tur == "isletim-sistemi") return new(15m, 120m, 1m, 45m);
-        if (tur == "platform") return new(8m, 160m, 1m, 40m);
-        if (tur == "altyapi" || kat.Contains("altyapi")) return new(10m, 220m, 2m, 60m);
-        if (tur == "yapay-zeka" || kat.Contains("yapay") || kat.Contains("ai")) return new(15m, 250m, 2m, 70m);
-        if (tur == "oyun" || kat.Contains("oyun")) return new(2m, 80m, 1m, 20m);
-        if (kat.Contains("finans") || kat.Contains("odeme") || kat.Contains("ticaret")) return new(5m, 140m, 1m, 35m);
-        if (kat.Contains("gelistir") || kat.Contains("analitik") || kat.Contains("veri")) return new(6m, 180m, 1m, 45m);
-        if (kat.Contains("mesaj") || kat.Contains("eposta") || kat.Contains("sosyal")) return new(1m, 60m, 0.5m, 12m);
-        if (kat.Contains("guvenlik")) return new(8m, 180m, 1m, 50m);
-        if (kat.Contains("medya") || kat.Contains("video") || kat.Contains("muzik")) return new(3m, 100m, 1m, 25m);
-        return new(2m, 120m, 1m, 25m);
+        if (tur == "isletim-sistemi") return new(2m, 18m, 0.5m, 7m);
+        if (tur == "platform") return new(2m, 25m, 0.5m, 9m);
+        if (tur == "altyapi" || kat.Contains("altyapi")) return new(3m, 30m, 0.5m, 12m);
+        if (tur == "yapay-zeka" || kat.Contains("yapay") || kat.Contains("ai")) return new(3m, 35m, 0.5m, 14m);
+        if (tur == "oyun" || kat.Contains("oyun")) return new(0.5m, 12m, 0.25m, 4m);
+        if (kat.Contains("finans") || kat.Contains("odeme") || kat.Contains("ticaret")) return new(1m, 18m, 0.5m, 6m);
+        if (kat.Contains("gelistir") || kat.Contains("analitik") || kat.Contains("veri")) return new(1.5m, 22m, 0.5m, 8m);
+        if (kat.Contains("mesaj") || kat.Contains("eposta") || kat.Contains("sosyal")) return new(0.25m, 8m, 0.25m, 2.5m);
+        if (kat.Contains("guvenlik")) return new(2m, 25m, 0.5m, 9m);
+        if (kat.Contains("medya") || kat.Contains("video") || kat.Contains("muzik")) return new(1m, 15m, 0.5m, 5m);
+        return new(0.5m, 15m, 0.25m, 4m);
     }
 
     public static decimal Sinirla(string? urunTuru, string? kategori, decimal fiyat)
