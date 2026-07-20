@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- V9.1 sınıfları aynı ana sınıf adlarını kullanır; bütün eski panel ve akış sürümleri derlenmez. -->
+    <!-- V9.1 sınıfları aynı ana sınıf adlarını kullanır; bütün eski eş adlı panel ve akış sürümleri derlenmez. -->
     <Compile Remove="CanliPano/YazilimBorsasiHtml.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV2.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV3.cs" />
@@ -45,18 +45,6 @@
     <Compile Remove="Isletim/KodTabanliSirketIsletimYoneticisi.cs" />
     <Compile Remove="Isletim/EkosistemYoneticisi.cs" />
     <Compile Remove="Isletim/V9EkonomiYoneticisi.cs" />
-
-    <!-- V9.1'de kullanılmayan eski ekonomi, kredi, fiyat ve migrasyon katmanları binary'ye girmez. -->
-    <Compile Remove="Isletim/EkonomiDengeV7Yoneticisi.cs" />
-    <Compile Remove="Isletim/EkonomiV6Yoneticisi.cs" />
-    <Compile Remove="Isletim/FinansV7Yoneticisi.cs" />
-    <Compile Remove="Isletim/PazarFiyatOzTesti.cs" />
-    <Compile Remove="Isletim/PazarFiyatYoneticisi.cs" />
-    <Compile Remove="Isletim/PazarGelirDuzeltmeYoneticisi.cs" />
-    <Compile Remove="Isletim/V81AdilBaslangicDengeleyicisi.cs" />
-    <Compile Remove="Isletim/V81SezonMigrasyonu.cs" />
-    <Compile Remove="Isler/CezaV8Yoneticisi.cs" />
-    <Compile Remove="Tick/BaglantiBazliSirketDonmaYoneticisi.cs" />
 
     <Compile Remove="Isler/IsYoneticisi.cs" />
     <Compile Remove="Isler/IsYoneticisiV2.cs" />
