@@ -35,6 +35,9 @@ public sealed class SirketTanitimMesaji : IJsonOnDeserialized
     [JsonPropertyName("apps")]
     public List<SunulanUygulama> Apps { get; init; } = [];
 
+    [JsonPropertyName("applications")]
+    public List<SunulanUygulama> Applications { get; init; } = [];
+
     [JsonPropertyName("protokoller")]
     public List<SunulanOzelProtokol> Protokoller { get; init; } = [];
 
@@ -42,7 +45,7 @@ public sealed class SirketTanitimMesaji : IJsonOnDeserialized
     public List<SunulanOzelProtokol> Protocols { get; init; } = [];
 
     [JsonExtensionData]
-    public Dictionary<string, JsonElement> EkAlanlar { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, JsonElement> EkAlanlar { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void OnDeserialized()
     {
@@ -51,6 +54,7 @@ public sealed class SirketTanitimMesaji : IJsonOnDeserialized
             .Concat(UygulamaManifestleri)
             .Concat(Products)
             .Concat(Apps)
+            .Concat(Applications)
             .ToList();
         List<SunulanOzelProtokol> protokoller = OzelProtokoller
             .Concat(Protokoller)
@@ -64,7 +68,7 @@ public sealed class SirketTanitimMesaji : IJsonOnDeserialized
                     .Contains(anahtar, StringComparer.OrdinalIgnoreCase))
                 continue;
 
-            UygulamalariOku(deger, uygulamalar, "uygulamalar", "urunler", "products", "apps", "uygulamaManifestleri");
+            UygulamalariOku(deger, uygulamalar, "uygulamalar", "urunler", "products", "apps", "applications", "uygulamaManifestleri");
             ProtokolleriOku(deger, protokoller, "ozelProtokoller", "protokoller", "protocols");
         }
 
@@ -94,7 +98,7 @@ public sealed class SirketTanitimMesaji : IJsonOnDeserialized
             if (!OzellikBul(nesne, alan, out JsonElement liste) || liste.ValueKind != JsonValueKind.Array) continue;
             try
             {
-                List<SunulanUygulama>? bulunan = listaDeserialize<SunulanUygulama>(liste);
+                List<SunulanUygulama>? bulunan = ListeyiOku<SunulanUygulama>(liste);
                 if (bulunan is not null) hedef.AddRange(bulunan);
             }
             catch { }
@@ -111,14 +115,14 @@ public sealed class SirketTanitimMesaji : IJsonOnDeserialized
             if (!OzellikBul(nesne, alan, out JsonElement liste) || liste.ValueKind != JsonValueKind.Array) continue;
             try
             {
-                List<SunulanOzelProtokol>? bulunan = listaDeserialize<SunulanOzelProtokol>(liste);
+                List<SunulanOzelProtokol>? bulunan = ListeyiOku<SunulanOzelProtokol>(liste);
                 if (bulunan is not null) hedef.AddRange(bulunan);
             }
             catch { }
         }
     }
 
-    private static List<T>? listaDeserialize<T>(JsonElement element) =>
+    private static List<T>? ListeyiOku<T>(JsonElement element) =>
         JsonSerializer.Deserialize<List<T>>(element.GetRawText(), UyumlulukJsonu);
 
     private static bool OzellikBul(JsonElement nesne, string aranan, out JsonElement deger)
