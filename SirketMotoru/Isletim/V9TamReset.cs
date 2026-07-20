@@ -4,8 +4,8 @@ using System.Text.Json;
 namespace SirketMotoru.Isletim;
 
 /// <summary>
-/// V9.2'ye geçişte bütün motor çalışma verisini son kez arşivleyip temizler.
-/// Şirket kaynak kodları, manifestleri, motor ayarları ve katalog korunur.
+/// V9.2 ekonomi denge paketinde kullanıcı talebiyle şirket çalışma verilerini
+/// yeniden arşivleyip temizler. Kodlar, manifestler, motor ayarları ve katalog korunur.
 /// </summary>
 public static class V9TamReset
 {
@@ -27,7 +27,8 @@ public static class V9TamReset
         "v8.1-tam-sirket-reset-v2.json",
         "v8.1-adil-baslangic-v1.json",
         "v9-temiz-sezon-1.json",
-        "v9.1-temiz-sezon-2.json"
+        "v9.1-temiz-sezon-2.json",
+        "v9.2-son-temiz-sezon-3.json"
     ];
 
     public static async Task UygulaAsync(
@@ -37,15 +38,16 @@ public static class V9TamReset
         ArgumentException.ThrowIfNullOrWhiteSpace(motorVerileriKlasoru);
         string kok = Path.GetFullPath(motorVerileriKlasoru);
         Directory.CreateDirectory(kok);
-        string isaret = Path.Combine(kok, "v9.2-son-temiz-sezon-3.json");
+        string isaret = Path.Combine(kok, "v9.2-ekonomi-dengesi-reset-4.json");
         if (File.Exists(isaret))
         {
-            KonsolKayitcisi.Bilgi("V9.2 son reset daha önce uygulanmış; mevcut oyun ilerlemesi korunuyor.");
+            KonsolKayitcisi.Bilgi(
+                "V9.2 ekonomi denge reseti daha önce uygulanmış; mevcut oyun ilerlemesi korunuyor.");
             return;
         }
 
         string zaman = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss");
-        string arsiv = Path.Combine(kok, "Arsiv", $"V9.2-son-reset-oncesi-{zaman}");
+        string arsiv = Path.Combine(kok, "Arsiv", $"V9.2-ekonomi-denge-reset-oncesi-{zaman}");
         Directory.CreateDirectory(arsiv);
 
         foreach (string ad in CalismaDosyalari)
@@ -66,12 +68,14 @@ public static class V9TamReset
                      "*reset-v*.json",
                      "v9-*.json",
                      "v9.1-*.json",
+                     "v9.2-*.json",
                      "olaylar-*.json"
                  })
         {
             foreach (string dosya in Directory.EnumerateFiles(kok, desen, SearchOption.TopDirectoryOnly))
             {
-                if (Path.GetFullPath(dosya).Equals(Path.GetFullPath(isaret), StringComparison.OrdinalIgnoreCase)) continue;
+                if (Path.GetFullPath(dosya).Equals(Path.GetFullPath(isaret), StringComparison.OrdinalIgnoreCase))
+                    continue;
                 string hedef = Path.Combine(arsiv, Path.GetFileName(dosya));
                 if (!File.Exists(hedef)) File.Copy(dosya, hedef);
                 File.Delete(dosya);
@@ -80,10 +84,10 @@ public static class V9TamReset
 
         var kayit = new
         {
-            surum = "9.2-son-temiz-sezon-3",
+            surum = "9.2-ekonomi-dengesi-reset-4",
             uygulamaZamani = DateTimeOffset.Now,
             arsiv,
-            not = "Bu reset V9.2 için istenen son toplu sıfırlamadır. Sonraki sürümlerde mevcut oyun verisi güncellenerek korunacaktır.",
+            not = "Aşırı kârı dengeleyen kademeli maliyet ve yoğun olay sistemi için uygulanan tek seferlik reset.",
             korunanlar = new[]
             {
                 "motor-ayarlari.json",
@@ -94,11 +98,19 @@ public static class V9TamReset
             {
                 "şirket kasaları, gelir-gider ve bütün bilanço sayaçları",
                 "yatırım seviyeleri, krediler, temerrütler ve ödenemeyen giderler",
-                "tek seferlik ve geçici destekler",
                 "uygulama, işletim sistemi ve protokol piyasa kayıtları",
-                "eski kapasite tahsisleri",
+                "kapasite tahsisleri",
                 "müşteri işletim sistemi, uygulama, sadakat ve işlem geçmişi",
                 "haber, olay, arz-talep ve tick geçmişi"
+            },
+            dengeKurallari = new[]
+            {
+                "sabit operasyon maliyeti",
+                "kullanıcı ve kapasite maliyeti",
+                "ciroya bağlı kademeli değişken maliyet",
+                "düşük teknik puanlarda verimsizlik katsayısı",
+                "yüksek kapasite kullanımında ek baskı maliyeti",
+                "daha sık fakat kasa ve ciroyla sınırlı iyi-kötü olaylar"
             }
         };
         string gecici = isaret + ".tmp";
@@ -110,6 +122,6 @@ public static class V9TamReset
         File.Move(gecici, isaret, overwrite: true);
 
         KonsolKayitcisi.Basari(
-            $"V9.2 SON TAM RESET tamamlandı | Motor çalışma verileri temizlendi | Arşiv: {arsiv}");
+            $"V9.2 EKONOMİ DENGE RESETİ tamamlandı | Şirket verileri temizlendi | Arşiv: {arsiv}");
     }
 }
