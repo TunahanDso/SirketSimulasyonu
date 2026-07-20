@@ -52,7 +52,7 @@ public static class V93SiberOlayDeposu
         bool engellendi,
         decimal finansalEtki)
     {
-        int karma = Math.Abs(HashCode.Combine(tick, sirketKimligi, hizmetKimligi, zorluk, engellendi));
+        int karma = HashCode.Combine(tick, sirketKimligi, hizmetKimligi, zorluk, engellendi) & int.MaxValue;
         var kaynak = Kaynaklar[karma % Kaynaklar.Length];
         string tur = SaldiriTuru(hizmetKimligi, zorluk, karma);
         (double hedefEnlem, double hedefBoylam) = Hedef(sirketKimligi);
@@ -154,7 +154,7 @@ public static class V93SiberOlayDeposu
 
     private static (double Enlem, double Boylam) Hedef(string sirketKimligi)
     {
-        int karma = Math.Abs(sirketKimligi.GetHashCode(StringComparison.OrdinalIgnoreCase));
+        int karma = sirketKimligi.GetHashCode(StringComparison.OrdinalIgnoreCase) & int.MaxValue;
         return (39.0 + karma % 60 / 100d, 28.0 + karma % 160 / 100d);
     }
 
