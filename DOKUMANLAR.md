@@ -2,88 +2,94 @@
 
 Bu dosya, Üç Kardeş Yazılım Şirketi Simülasyonu için güncel teknik belgelerin ana indeksidir.
 
-> **Güncel ana sürüm: V9.1 temiz motor**  
-> V9.1; eski üst üste binmiş ekonomi katmanlarını kaldırır, şirket verilerini yeniden sıfırlar, hizmet fiyatlarını sabitler, tek fiziksel kapasite havuzu kurar ve 20.000 müşterilik trendli pazarı tek ekonomi defterinden işletir.
+> **Güncel ana sürüm: V9.2 kontrollü geliştirme sürümü**  
+> V9.2, çalışan V9.1 motorunu koruyarak ayrıntılı şirketler borsası, çoklu protokol, yeniden ürün düzenleme, toplu hizmet kapasitesi ve gelişmiş haber/olay sistemini ekler.
+
+> **Reset kararı:** V9.2 ilk açılışında kullanıcı talebiyle son bir tam çalışma verisi reseti uygulanır. Bundan sonraki sürümlerde ilerleme korunur ve mevcut veri migrasyonla güncellenir.
 
 ---
 
-## 1. Önce okunacak ana belge
+## 1. Önce okunacak belgeler
 
-### [V9.1 Temiz Ekonomi, Kapasite, Talep ve Panel Rehberi](Dokumanlar/V9_1_TEMIZ_EKONOMI_KAPASITE_TALEP_VE_PANOLAR.md)
+1. [V9.2 Borsa, Çoklu Protokol, Toplu Kapasite ve Son Reset](Dokumanlar/V9_2_BORSA_COKLU_PROTOKOL_TOPLU_KAPASITE_VE_SON_RESET.md)
+2. [V9.1 Temiz Ekonomi, Kapasite, Talep ve Panel Rehberi](Dokumanlar/V9_1_TEMIZ_EKONOMI_KAPASITE_TALEP_VE_PANOLAR.md)
+3. [500 Hizmet ve 200 Uygulama Kategorisi Standardı](Dokumanlar/500_HIZMET_200_UYGULAMA_KATEGORISI_STANDARDI.md)
+4. [Tunix OS Teknik Rehberi](Dokumanlar/TUNIX_OS_TEKNIK_REHBERI.md)
+5. [Uygulama Manifesti V1](UYGULAMA_MANIFESTI_V1.md)
+6. [Sunucu Güncelleme V2 Rehberi](SUNUCU_GUNCELLEME_V2_REHBERI.md)
 
-Bu belge şu konularda önceki bütün belgelerden üstündür:
-
-- V9.1 tek seferlik tam reset,
-- dört şirket için eşit 100.000 TL ve 70 taban puan,
-- tek ekonomi ve yan etkisiz işletim deposu,
-- çevrimdışı şirketlerin ekonomik olarak donması,
-- sabit hizmet fiyatları,
-- kapasite satın alımının kaldırılması,
-- tek fiziksel havuz ve 8090 tahsis sliderları,
-- hafif giderler ve otomatik kredinin kaldırılması,
-- sabit faizli isteğe bağlı kredi,
-- başarısız işte yarım ödeme ve kademeli puan kaybı,
-- düşük siber kayıp,
-- en az yaklaşık 10.000 hizmet talebi,
-- 20.000 müşterinin OS ve uygulama tercihleri,
-- kategoriye özel uygulama/OS fiyat aralıkları,
-- gerçek uygulama ve abonelik geliri,
-- tek kanonik protokol kimliği,
-- bağımsız ve hafif SLA akışı,
-- kararlı 8080 ve 8090 panelleri.
+V9.2 belgesi borsa, kapasite tahsisi, ürün düzenleme, çoklu protokol, olay sistemi ve reset davranışında önceki belgelerden üstündür. V9.1 belgesi tek ekonomi, hizmet fiyatları, müşteri pazarı ve temel kredi/gider davranışında geçerliliğini korur.
 
 ---
 
-## 2. Okuma sırası
-
-### Motoru çalıştıracak kişi
-
-1. [V9.1 Temiz Ekonomi, Kapasite, Talep ve Panel Rehberi](Dokumanlar/V9_1_TEMIZ_EKONOMI_KAPASITE_TALEP_VE_PANOLAR.md)
-2. [500 Hizmet ve 200 Uygulama Kategorisi Standardı](Dokumanlar/500_HIZMET_200_UYGULAMA_KATEGORISI_STANDARDI.md)
-3. [Tunix OS Teknik Rehberi](Dokumanlar/TUNIX_OS_TEKNIK_REHBERI.md)
-4. [Uygulama Manifesti V1](UYGULAMA_MANIFESTI_V1.md)
-5. [Sunucu Güncelleme V2 Rehberi](SUNUCU_GUNCELLEME_V2_REHBERI.md)
-
-### Mudaf, Ugax, İlos Tech veya Tunix sunucusunu geliştirecek oyuncu
-
-1. [V9.1 Temiz Ekonomi, Kapasite, Talep ve Panel Rehberi](Dokumanlar/V9_1_TEMIZ_EKONOMI_KAPASITE_TALEP_VE_PANOLAR.md)
-2. [500 Hizmet ve 200 Uygulama Kategorisi Standardı](Dokumanlar/500_HIZMET_200_UYGULAMA_KATEGORISI_STANDARDI.md)
-3. [Uygulama Manifesti V1](UYGULAMA_MANIFESTI_V1.md)
-4. [Sunucu Güncelleme V2 Rehberi](SUNUCU_GUNCELLEME_V2_REHBERI.md)
-5. [Şirket İşletim Merkezi 8090 Rehberi](SIRKET_ISLETIM_MERKEZI_8090_REHBERI.md)
-
----
-
-## 3. Güncel V9.1 kuralları
+## 2. V9.2 temel kuralları
 
 ```text
 Kod ve gerçek hizmet işçiliği şirket sunucusunda yapılır.
 Motor teknik sonucu, kapasiteyi, muhasebeyi ve piyasayı doğrular.
 Manifestte ilan edilen hizmet gerçek yönlendiricide çalışmalıdır.
 500 standart hizmetin fiyatı motor tarafından sabittir.
-Hizmet ve uygulama kapasitesi satın alınamaz.
-Şirket toplam fiziksel kapasitesini hizmet, uygulama ve OS arasında tahsis eder.
-Toplam kapasite yalnız altyapı yatırımlarıyla büyür.
-Uygulama ve işletim sistemi fiyatları kategori min–max aralığında yönetilir.
-Her uygulama aktif OS ve kanonik protokol seçmeden çalışamaz.
+
+Her şirketin tek bir fiziksel kapasite havuzu vardır.
+Başlangıç fiziksel kapasitesi 2.500'dür.
+Yeni uygulama veya işletim sistemi yeni toplam kapasite üretmez.
+Hizmetler tek ortak kapasite havuzundan pay alır.
+Her uygulama ve işletim sistemi aynı toplam havuzdan ayrı pay alır.
+Toplam kapasite yalnız altyapı yatırımıyla büyür.
+
+Uygulama ve OS fiyatları kategori min–max aralığındadır.
+Yayımlanmış ürünler 8090'dan yeniden düzenlenebilir.
+İşletim sistemleri birden fazla aktif protokol kabul edebilir.
+Uygulamanın seçtiği bütün protokoller seçilen OS tarafından desteklenmelidir.
+
 Bir şirketin kapalı olması global ticki durdurmaz.
-Kapalı şirket iş alamaz; gideri, kredisi, SLA'sı ve ürün ekonomisi donar.
+Kapalı şirket iş alamaz ve ekonomik olarak donar.
 Otomatik kurtarma kredisi yoktur.
-Kredi girişi gelir sayılmaz.
-8080 salt okunur piyasa ekranıdır.
-8090 şirkete özel ticari ve altyapı yönetim ekranıdır.
+Negatif rastgele olay şirket kasasından fazla kesinti yapamaz.
+
+8080 salt okunur piyasa ve borsa ekranıdır.
+8090 şirkete özel ticari, ürün ve altyapı yönetim ekranıdır.
 ```
 
 ---
 
-## 4. Güncel panolar
+## 3. V9.2 panoları
 
 | Port | Sistem | Kapsam |
 |---:|---|---|
-| 8080 | Yazılım Borsası V9.1 | Trendli arz-talep, şirket finansı, uygulama/OS/hizmet pazarı, grafikler, müşteri CV, haber ve canlı akış |
-| 8090 | Şirket Yönetim Merkezi V9.1 | Finans, banka, kapasite tahsisi, uygulama/OS yayını, 500 hizmet, 200 kategori, protokoller, SLA ve yatırımlar |
+| 8080 | Yazılım Borsası V9.2 | Şirket değer sıralaması, tahmini hisse, finans, kapasite, kurumsal puanlar, uygulama/OS/hizmet pazarı, müşteri CV ve şaşaalı haber merkezi |
+| 8090 | Şirket Yönetim Merkezi V9.2 | Toplu hizmet kapasitesi, ürün/OS tahsisi, yeniden ürün düzenleme, çoklu protokol, ürün fiyatı, 500 hizmet, 200 kategori, SLA, yatırım, finans ve şirket haberleri |
 
-Her iki panel de tek DOM kökü kullanır. Yalnız açık panel render edilir. Window ve iç tablo scroll konumları canlı yenilemede korunur.
+Her iki panel tek görünüm kökü kullanır. Canlı yenileme sırasında aktif sekme ve iç tablo scroll konumları korunur.
+
+---
+
+## 4. Son temiz sezon
+
+V9.2 ilk çalıştırmada çalışma verilerini arşivler ve temizler:
+
+```text
+MotorVerileri/Arsiv/V9.2-son-reset-oncesi-YYYYMMDD-HHMMSS/
+MotorVerileri/v9.2-son-temiz-sezon-3.json
+```
+
+Korunanlar:
+
+- şirket sunucu kodları,
+- manifestler,
+- `motor-ayarlari.json`,
+- `hizmet-katalogu.json`.
+
+Sıfırlananlar:
+
+- bilançolar ve kasalar,
+- yatırımlar ve krediler,
+- ürün/protokol piyasa kayıtları,
+- kapasite tahsisleri,
+- müşteri OS/uygulama geçmişleri,
+- haber, olay, talep ve tick geçmişi.
+
+Bu resetten sonra yeni sürümler mevcut veriyi koruyarak ilerlemelidir.
 
 ---
 
@@ -100,31 +106,39 @@ Her iki panel de tek DOM kökü kullanır. Yalnız açık panel render edilir. W
 
 ## 6. Destekleyici belgeler
 
-- [500 Hizmet ve 200 Uygulama Kategorisi Standardı](Dokumanlar/500_HIZMET_200_UYGULAMA_KATEGORISI_STANDARDI.md)
-- [Tunix OS Teknik Rehberi](Dokumanlar/TUNIX_OS_TEKNIK_REHBERI.md)
 - [Siber Saldırı Savunma Rehberi](SIBER_SALDIRI_SAVUNMA_REHBERI.md)
 - [Şirket İşletim Merkezi 8090 Rehberi](SIRKET_ISLETIM_MERKEZI_8090_REHBERI.md)
-- [Uygulama Manifesti V1](UYGULAMA_MANIFESTI_V1.md)
-- [Sunucu Güncelleme V2 Rehberi](SUNUCU_GUNCELLEME_V2_REHBERI.md)
 - [İlk 10 Hizmet Sözleşmesi](HIZMET_SOZLESMELERI_V2.md)
+- [V8 Ceza, Uyum ve Panel Geçiş Rehberi](Dokumanlar/V8_CEZA_UYUM_KATALOG_VE_PANEL_GECIS_REHBERI.md)
+- [V7 Finans ve Banka Rehberi](Dokumanlar/V7_FINANS_BANKA_SLA_PANOLAR_VE_TUNIX_HIZMETLERI.md)
 
-`HIZMET_SOZLESMELERI_V2.md` ilk 10 çekirdek hizmetin sıkı sonuç doğrulamasını korur. Genel motor kataloğu 500 hizmettir.
-
-Eski V6–V8 belgeleri tarihsel tasarım kararlarını anlamak için tutulur; ekonomi, reset, kapasite, kredi, fiyat ve panel davranışında V9.1 belgesi esas alınır.
+Eski V6–V8 belgeleri tarihsel tasarım kararları için tutulur. Güncel davranışta önce V9.2, ardından V9.1 belgeleri esas alınır.
 
 ---
 
 ## 7. Güncelleme sonrası test
 
-```powershell
-git pull --ff-only origin agent/tunix-matematik-topla
+CMD:
 
+```cmd
+git pull --ff-only origin agent/tunix-matematik-topla
 dotnet clean .\SirketMotoru\SirketMotoru.csproj
 dotnet build .\SirketMotoru\SirketMotoru.csproj
 
-Push-Location .\Sirketler\Tunahan-Rustix\Tunix
+cd /d Sirketler\Tunahan-Rustix\Tunix
 cargo test
-Pop-Location
+cd /d ..\..\..
 ```
 
-Motor derlemesi ve şirket testleri geçmeden V9.1 davranışı doğrulanmış kabul edilmez. İlk gerçek çalıştırmada otomatik arşiv ve `v9.1-temiz-sezon-2.json` işaretli tam reset uygulanır.
+İlk açılışta beklenen ana loglar:
+
+```text
+V9.2 SON TAM RESET tamamlandı
+V9.2 ekosistem hazır
+V9.2 olay merkezi hazır
+Yazılım borsası V9.2 yayında
+Şirket yönetim merkezi V9.2 yayında
+V9.2 tick sistemi başladı
+```
+
+Motor derlemesi ve şirket testleri geçmeden V9.2 davranışı doğrulanmış kabul edilmez.
