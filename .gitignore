@@ -26,7 +26,7 @@ Desktop.ini
 *.log
 
 # Motor çalışma verileri
-# V9 ilk açılışta eski durumu arşivler; aşağıdaki dosyalar Git/stash kapsamına alınmaz.
+# V9.1 ilk açılışta eski durumu arşivler; aşağıdaki dosyalar Git/stash kapsamına alınmaz.
 MotorVerileri/musteriler.json
 MotorVerileri/musteriler.json.tmp
 MotorVerileri/sirket-bilancolari.json
@@ -52,5 +52,5 @@ MotorVerileri/tick-saat.json.tmp
 MotorVerileri/tek-seferlik-destekler.json
 MotorVerileri/tek-seferlik-destekler.json.tmp
 MotorVerileri/v8.1-*.json
-MotorVerileri/v9-temiz-sezon-*.json
+MotorVerileri/v9*.json
 MotorVerileri/Arsiv/
