@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- V9.1 sınıfları aynı ana sınıf adlarını kullanır; bütün eski eş adlı panel ve akış sürümleri derlenmez. -->
+    <!-- 8080: yalnız V11 HTML ve V5 veri sunucusu aktiftir. -->
     <Compile Remove="CanliPano/YazilimBorsasiHtml.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV2.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV3.cs" />
@@ -18,11 +18,13 @@
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV7.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV8.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV9.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV10.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusu.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusuV2.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusuV3.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusuV4.cs" />
 
+    <!-- 8090: yalnız V11 HTML ve V9 sunucusu aktiftir. -->
     <Compile Remove="Isletim/SirketYonetimHtml.cs" />
     <Compile Remove="Isletim/SirketYonetimHtmlV2.cs" />
     <Compile Remove="Isletim/SirketYonetimHtmlV3.cs" />
@@ -32,7 +34,7 @@
     <Compile Remove="Isletim/SirketYonetimHtmlV7.cs" />
     <Compile Remove="Isletim/SirketYonetimHtmlV8.cs" />
     <Compile Remove="Isletim/SirketYonetimHtmlV9.cs" />
-
+    <Compile Remove="Isletim/SirketYonetimHtmlV10.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusu.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusuV2.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusuV3.cs" />
@@ -40,10 +42,14 @@
     <Compile Remove="Isletim/SirketYonetimSunucusuV5.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusuV6.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusuV7.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusuV8.cs" />
+
+    <!-- V9.2 çekirdeği: yan etkisiz V3 depo, V10 ekosistem, V2 ekonomi ve V5 tick. -->
     <Compile Remove="Isletim/SirketIsletimYoneticisi.cs" />
     <Compile Remove="Isletim/SirketIsletimYoneticisiV2.cs" />
     <Compile Remove="Isletim/KodTabanliSirketIsletimYoneticisi.cs" />
     <Compile Remove="Isletim/EkosistemYoneticisi.cs" />
+    <Compile Remove="Isletim/EkosistemYoneticisiV9.cs" />
     <Compile Remove="Isletim/V9EkonomiYoneticisi.cs" />
 
     <Compile Remove="Isler/IsYoneticisi.cs" />
