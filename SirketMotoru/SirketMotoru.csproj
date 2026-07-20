@@ -40,6 +40,7 @@
     <Compile Remove="Isletim/SirketYonetimSunucusuV7.cs" />
     <Compile Remove="Isletim/SirketIsletimYoneticisi.cs" />
     <Compile Remove="Isletim/KodTabanliSirketIsletimYoneticisi.cs" />
+    <Compile Remove="Isletim/EkosistemYoneticisi.cs" />
 
     <Compile Remove="Isler/IsYoneticisi.cs" />
     <Compile Remove="Isler/IsYoneticisiV2.cs" />
