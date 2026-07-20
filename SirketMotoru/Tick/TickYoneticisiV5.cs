@@ -123,6 +123,7 @@ public sealed class TickYoneticisi
         CanliPanoDurumDeposu.IslemeOzetiniGuncelle(isOzeti);
 
         await _v9.TickSonuAsync(tick, cancellationToken);
+        V92OlayOzetSifirlayici.Sifirla();
         await _olaylar.TickSonuAsync(tick, cancellationToken);
         await _sirketler.BilancolariKaydetVeYayinlaAsync(tick, cancellationToken);
         await _musteriler.GerekirseKaydetAsync(tick, cancellationToken);
