@@ -30,6 +30,7 @@
     <Compile Remove="Isletim/SirketYonetimHtmlV6.cs" />
     <Compile Remove="Isletim/SirketYonetimHtmlV7.cs" />
     <Compile Remove="Isletim/SirketYonetimHtmlV8.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV9.cs" />
 
     <Compile Remove="Isletim/SirketYonetimSunucusu.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusuV2.cs" />
