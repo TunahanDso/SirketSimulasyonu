@@ -118,7 +118,7 @@ public sealed class TickYoneticisi
 
         await _v9.TickOncesiAsync(tick, cancellationToken);
         await _kapasiteDengeleyicisi.UrunKapasiteleriniFizikselYapAsync(cancellationToken);
-        V93HizmetKapasiteDeposu.TickBaslat(tick);
+        V93HizmetKapasiteDeposu.TickBaslat(tick, _sirketler.SirketKayitlari);
 
         await _isletimKoordinatoru.TickCalistirAsync(tick, cancellationToken);
 
