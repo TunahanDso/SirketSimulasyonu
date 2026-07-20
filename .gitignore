@@ -26,7 +26,6 @@ Desktop.ini
 *.log
 
 # Motor çalışma verileri
-# V9.2 son temiz sezon çalışma kayıtları Git/stash kapsamına alınmaz.
 MotorVerileri/musteriler.json
 MotorVerileri/musteriler.json.tmp
 MotorVerileri/sirket-bilancolari.json
@@ -49,6 +48,8 @@ MotorVerileri/ceza-v8.json
 MotorVerileri/ceza-v8.json.tmp
 MotorVerileri/olaylar-v92.json
 MotorVerileri/olaylar-v92.json.tmp
+MotorVerileri/yayin-maliyetleri-v93.json
+MotorVerileri/yayin-maliyetleri-v93.json.tmp
 MotorVerileri/tick-saat.json
 MotorVerileri/tick-saat.json.tmp
 MotorVerileri/tek-seferlik-destekler.json
