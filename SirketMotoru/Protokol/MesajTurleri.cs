@@ -22,4 +22,7 @@ public static class MesajTurleri
 
     public const string IsSonucu =
         "isSonucu";
+
+    public const string FinansDurumu =
+        "finansDurumu";
 }

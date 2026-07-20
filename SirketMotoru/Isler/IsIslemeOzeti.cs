@@ -16,6 +16,14 @@ public sealed class IsIslemeOzeti
 
     public int ButceYetersizIsSayisi { get; set; }
 
+    public int KotuNiyetliIsSayisi { get; set; }
+
+    public int EngellenenSaldiriSayisi { get; set; }
+
+    public int BasariliSaldiriSayisi { get; set; }
+
+    public decimal ToplamGuvenlikKaybi { get; set; }
+
     public decimal ToplamCiro { get; set; }
 
     public double ToplamIslemSuresiMs { get; set; }

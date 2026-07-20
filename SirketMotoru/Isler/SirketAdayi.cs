@@ -18,6 +18,12 @@ public sealed class SirketAdayi
 
     public double GuvenilirlikPuani { get; init; }
 
+    public double KodKalitesiPuani { get; init; }
+
+    public double PerformansPuani { get; init; }
+
+    public double GuvenlikPuani { get; init; }
+
     public double HizPuani { get; init; }
 
     public double KapasitePuani { get; init; }

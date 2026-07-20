@@ -2,7 +2,15 @@ namespace SirketMotoru.Kayit;
 
 public static class KonsolKayitcisi
 {
-    private static readonly object Kilit = new();
+    private const int AzamiKayitSayisi =
+        500;
+
+    private static readonly object Kilit =
+        new();
+
+    private static readonly Queue<KonsolKaydi>
+        SonKayitlar =
+            new();
 
     public static void Bilgi(string mesaj)
     {
@@ -28,10 +36,52 @@ public static class KonsolKayitcisi
     {
         lock (Kilit)
         {
-            Console.ForegroundColor = ConsoleColor.Magenta;
+            KayitEkle(
+                new KonsolKaydi
+                {
+                    Zaman =
+                        DateTimeOffset.Now,
+
+                    Seviye =
+                        "TICK",
+
+                    Mesaj =
+                        $"Tick {tickNumarasi} başladı.",
+
+                    TickNumarasi =
+                        tickNumarasi
+                });
+
+            Console.ForegroundColor =
+                ConsoleColor.Magenta;
+
             Console.WriteLine();
-            Console.WriteLine($"================ TICK {tickNumarasi} ================");
+
+            Console.WriteLine(
+                $"================ TICK " +
+                $"{tickNumarasi} ================");
+
             Console.ResetColor();
+        }
+    }
+
+    public static IReadOnlyList<KonsolKaydi>
+        SonKayitlariGetir(
+            int azamiKayitSayisi = 250)
+    {
+        int sinir =
+            Math.Clamp(
+                azamiKayitSayisi,
+                1,
+                AzamiKayitSayisi);
+
+        lock (Kilit)
+        {
+            return SonKayitlar
+                .TakeLast(
+                    sinir)
+                .ToList()
+                .AsReadOnly();
         }
     }
 
@@ -40,16 +90,67 @@ public static class KonsolKayitcisi
         string mesaj,
         ConsoleColor renk)
     {
+        ArgumentNullException.ThrowIfNull(
+            mesaj);
+
         lock (Kilit)
         {
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.Write($"[{DateTime.Now:HH:mm:ss}] ");
+            DateTimeOffset zaman =
+                DateTimeOffset.Now;
 
-            Console.ForegroundColor = renk;
-            Console.Write($"[{seviye}] ");
+            KayitEkle(
+                new KonsolKaydi
+                {
+                    Zaman =
+                        zaman,
+
+                    Seviye =
+                        seviye,
+
+                    Mesaj =
+                        mesaj
+                });
+
+            Console.ForegroundColor =
+                ConsoleColor.DarkGray;
+
+            Console.Write(
+                $"[{zaman:HH:mm:ss}] ");
+
+            Console.ForegroundColor =
+                renk;
+
+            Console.Write(
+                $"[{seviye}] ");
 
             Console.ResetColor();
-            Console.WriteLine(mesaj);
+
+            Console.WriteLine(
+                mesaj);
         }
     }
+
+    private static void KayitEkle(
+        KonsolKaydi kayit)
+    {
+        SonKayitlar.Enqueue(
+            kayit);
+
+        while (SonKayitlar.Count >
+               AzamiKayitSayisi)
+        {
+            SonKayitlar.Dequeue();
+        }
+    }
+}
+
+public sealed class KonsolKaydi
+{
+    public DateTimeOffset Zaman { get; init; }
+
+    public string Seviye { get; init; } = string.Empty;
+
+    public string Mesaj { get; init; } = string.Empty;
+
+    public long? TickNumarasi { get; init; }
 }

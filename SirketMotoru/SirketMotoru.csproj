@@ -7,4 +7,63 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- 8080: yalnız V12 HTML ve V6 veri sunucusu aktiftir. -->
+    <Compile Remove="CanliPano/YazilimBorsasiHtml.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV2.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV3.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV4.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV5.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV6.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV7.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV8.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV9.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV10.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV11.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiSunucusu.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiSunucusuV2.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiSunucusuV3.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiSunucusuV4.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiSunucusuV5.cs" />
+
+    <!-- 8090: yalnız V11 HTML ve V9 sunucusu aktiftir. -->
+    <Compile Remove="Isletim/SirketYonetimHtml.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV2.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV3.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV4.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV5.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV6.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV7.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV8.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV9.cs" />
+    <Compile Remove="Isletim/SirketYonetimHtmlV10.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusu.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusuV2.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusuV3.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusuV4.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusuV5.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusuV6.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusuV7.cs" />
+    <Compile Remove="Isletim/SirketYonetimSunucusuV8.cs" />
+
+    <!-- V9.3 çekirdeği. -->
+    <Compile Remove="Isletim/SirketIsletimYoneticisi.cs" />
+    <Compile Remove="Isletim/SirketIsletimYoneticisiV2.cs" />
+    <Compile Remove="Isletim/KodTabanliSirketIsletimYoneticisi.cs" />
+    <Compile Remove="Isletim/EkosistemYoneticisi.cs" />
+    <Compile Remove="Isletim/EkosistemYoneticisiV9.cs" />
+    <Compile Remove="Isletim/V9EkonomiYoneticisi.cs" />
+
+    <Compile Remove="Isler/IsYoneticisi.cs" />
+    <Compile Remove="Isler/IsYoneticisiV2.cs" />
+    <Compile Remove="Isler/IsYoneticisiV3.cs" />
+    <Compile Remove="Isler/IsYoneticisiV4.cs" />
+    <Compile Remove="Tick/TickYoneticisi.cs" />
+    <Compile Remove="Tick/TickYoneticisiV2.cs" />
+    <Compile Remove="Tick/TickYoneticisiV3.cs" />
+    <Compile Remove="Tick/TickYoneticisiV4.cs" />
+    <Compile Remove="Musteriler/MusteriYoneticisi.cs" />
+    <Compile Remove="Musteriler/MusteriYoneticisiV2.cs" />
+  </ItemGroup>
+
 </Project>

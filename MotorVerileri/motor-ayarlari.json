@@ -1,28 +1,68 @@
-﻿{
+{
   "motorKimligi": "ana-motor",
   "protokolSurumu": "0.1",
   "tickSuresiSaniye": 10,
   "baglantiZamanAsimiMs": 3000,
   "mesajZamanAsimiMs": 3000,
   "azamiMesajBoyutuByte": 65536,
+  "canliPanoAktif": true,
+  "canliPanoPortu": 8080,
+  "canliPanoYenilemeMs": 1000,
+  "sirketYonetimAktif": true,
+  "sirketYonetimPortu": 8090,
+  "sirketYonetimOturumDakika": 180,
   "sirketler": [
     {
       "sirketKimligi": "tunahan-tunix",
       "sirketAdi": "Tunix",
       "adres": "127.0.0.1",
-      "port": 7001
+      "port": 7001,
+      "baslangicKasasi": 100000,
+      "baslangicItibarPuani": 70,
+      "baslangicGuvenilirlikPuani": 70,
+      "baslangicKodKalitesiPuani": 70,
+      "baslangicPerformansPuani": 70,
+      "baslangicGuvenlikPuani": 70,
+      "baslangicMusteriMemnuniyeti": 70
     },
     {
       "sirketKimligi": "mustafa-mudaf",
       "sirketAdi": "Mudaf",
       "adres": "192.168.1.26",
-      "port": 7002
+      "port": 7002,
+      "baslangicKasasi": 100000,
+      "baslangicItibarPuani": 70,
+      "baslangicGuvenilirlikPuani": 70,
+      "baslangicKodKalitesiPuani": 70,
+      "baslangicPerformansPuani": 70,
+      "baslangicGuvenlikPuani": 70,
+      "baslangicMusteriMemnuniyeti": 70
     },
     {
       "sirketKimligi": "ugur-ugax",
       "sirketAdi": "Ugax",
       "adres": "192.168.1.36",
-      "port": 7003
+      "port": 7003,
+      "baslangicKasasi": 100000,
+      "baslangicItibarPuani": 70,
+      "baslangicGuvenilirlikPuani": 70,
+      "baslangicKodKalitesiPuani": 70,
+      "baslangicPerformansPuani": 70,
+      "baslangicGuvenlikPuani": 70,
+      "baslangicMusteriMemnuniyeti": 70
+    },
+    {
+      "sirketKimligi": "ilayda-ilos-tech",
+      "sirketAdi": "İlos Tech",
+      "adres": "127.0.0.1",
+      "port": 7004,
+      "baslangicKasasi": 100000,
+      "baslangicItibarPuani": 70,
+      "baslangicGuvenilirlikPuani": 70,
+      "baslangicKodKalitesiPuani": 70,
+      "baslangicPerformansPuani": 70,
+      "baslangicGuvenlikPuani": 70,
+      "baslangicMusteriMemnuniyeti": 70
     }
   ]
 }

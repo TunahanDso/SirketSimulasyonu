@@ -24,6 +24,15 @@ public sealed class HizmetTalebi
     public int ZamanAsimiMs { get; init; } =
         5_000;
 
+    public int ZorlukSeviyesi { get; init; } = 1;
+
+    public bool KotuNiyetli { get; init; }
+
+    public string KotuNiyetTuru { get; init; } =
+        string.Empty;
+
+    public decimal OlasiGuvenlikKaybi { get; init; }
+
     public IsDurumu Durum { get; set; } =
         IsDurumu.Olusturuldu;
 
