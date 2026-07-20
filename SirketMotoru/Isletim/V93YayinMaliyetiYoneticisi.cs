@@ -85,7 +85,7 @@ public sealed class V93YayinMaliyetiYoneticisi
                     x.SirketKimligi.Equals(durum.SirketKimligi, StringComparison.OrdinalIgnoreCase));
                 if (sirket is null) continue;
 
-                foreach (UrunKaydi urun in durum.Urunler.Where(x => !_veri.UcretlendirilenUrunler.Contains(x.UrunKimligi)))
+                foreach (UrunKaydi urun in durum.Urunler.Where(x => x.Aktif && !_veri.UcretlendirilenUrunler.Contains(x.UrunKimligi)))
                 {
                     decimal hedef = HedefUrunMaliyeti(urun.UrunTuru);
                     decimal eskiHedef = EskiUrunMaliyeti(urun.UrunTuru);
@@ -95,6 +95,7 @@ public sealed class V93YayinMaliyetiYoneticisi
                         urun.Aktif = false;
                         IslemEkle(durum, tick, "lansman-bekliyor",
                             $"{urun.UrunAdi} için {ekBedel:N2} TL ek lansman sermayesi yetersiz; ürün pasif bırakıldı.", 0);
+                        degisti = true;
                         continue;
                     }
 
@@ -109,7 +110,7 @@ public sealed class V93YayinMaliyetiYoneticisi
             }
 
             foreach (OzelProtokolKaydi protokol in dosya.Protokoller
-                         .Where(x => !_veri.UcretlendirilenProtokoller.Contains(x.ProtokolKimligi)))
+                         .Where(x => x.Aktif && !_veri.UcretlendirilenProtokoller.Contains(x.ProtokolKimligi)))
             {
                 SirketKaydi? sirket = _sirketler.SirketKayitlari.FirstOrDefault(x =>
                     x.SirketKimligi.Equals(protokol.SahipSirketKimligi, StringComparison.OrdinalIgnoreCase));
@@ -124,6 +125,7 @@ public sealed class V93YayinMaliyetiYoneticisi
                     protokol.Aktif = false;
                     IslemEkle(durum, tick, "protokol-bekliyor",
                         $"{protokol.ProtokolAdi} için {ek:N2} TL ek geliştirme/yayın sermayesi yetersiz; protokol pasif.", 0);
+                    degisti = true;
                     continue;
                 }
 
