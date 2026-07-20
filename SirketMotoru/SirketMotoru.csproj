@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- 8080: yalnız V11 HTML ve V5 veri sunucusu aktiftir. -->
+    <!-- 8080: yalnız V11 HTML ve V6 V9.2 veri sunucusu aktiftir. -->
     <Compile Remove="CanliPano/YazilimBorsasiHtml.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV2.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV3.cs" />
@@ -23,6 +23,7 @@
     <Compile Remove="CanliPano/YazilimBorsasiSunucusuV2.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusuV3.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusuV4.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiSunucusuV5.cs" />
 
     <!-- 8090: yalnız V11 HTML ve V9 sunucusu aktiftir. -->
     <Compile Remove="Isletim/SirketYonetimHtml.cs" />
