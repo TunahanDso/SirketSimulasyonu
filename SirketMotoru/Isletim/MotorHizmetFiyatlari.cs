@@ -6,49 +6,50 @@ namespace SirketMotoru.Isletim;
 
 /// <summary>
 /// Standart hizmet fiyatlarının tek otoritesidir. Şirket manifesti veya 8090
-/// hizmet fiyatını değiştiremez. Aynı hizmet bütün şirketlerde aynı fiyattadır.
+/// hizmet fiyatını değiştiremez. V9.3'te hizmet işi ana gelir kaynağı değil,
+/// düşük marjlı sürekli nakit akışıdır.
 /// </summary>
 public static class MotorHizmetFiyatlari
 {
     private static readonly IReadOnlyDictionary<string, decimal> AileTabanFiyatlari =
         new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase)
         {
-            ["matematik"] = 12m,
-            ["metin"] = 10m,
-            ["dizi"] = 11m,
-            ["veri"] = 16m,
-            ["arama"] = 20m,
-            ["bildirim"] = 14m,
-            ["eposta"] = 22m,
-            ["sosyal"] = 24m,
-            ["mesajlasma"] = 23m,
-            ["profil"] = 18m,
-            ["kimlik"] = 30m,
-            ["guvenlik"] = 48m,
-            ["isletim"] = 60m,
-            ["dosya"] = 20m,
-            ["veritabani"] = 42m,
-            ["odeme"] = 50m,
-            ["ticaret"] = 38m,
-            ["medya"] = 36m,
-            ["harita"] = 30m,
-            ["takvim"] = 22m,
-            ["analitik"] = 46m,
-            ["gelistirme"] = 44m,
-            ["yapay-zeka"] = 85m,
-            ["cihaz"] = 40m,
-            ["sektor"] = 52m
+            ["matematik"] = 0.12m,
+            ["metin"] = 0.14m,
+            ["dizi"] = 0.16m,
+            ["veri"] = 0.28m,
+            ["arama"] = 0.25m,
+            ["bildirim"] = 0.16m,
+            ["eposta"] = 0.32m,
+            ["sosyal"] = 0.30m,
+            ["mesajlasma"] = 0.28m,
+            ["profil"] = 0.22m,
+            ["kimlik"] = 0.40m,
+            ["guvenlik"] = 0.75m,
+            ["isletim"] = 0.65m,
+            ["dosya"] = 0.30m,
+            ["veritabani"] = 0.60m,
+            ["odeme"] = 0.70m,
+            ["ticaret"] = 0.55m,
+            ["medya"] = 0.58m,
+            ["harita"] = 0.42m,
+            ["takvim"] = 0.25m,
+            ["analitik"] = 0.72m,
+            ["gelistirme"] = 0.68m,
+            ["yapay-zeka"] = 1.25m,
+            ["cihaz"] = 0.62m,
+            ["sektor"] = 0.80m
         };
 
     public static decimal Fiyat(string? hizmetKimligi, string? hizmetSurumu = "1.0")
     {
         string kimlik = hizmetKimligi?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(kimlik)) return 10m;
+        if (string.IsNullOrWhiteSpace(kimlik)) return 0.10m;
 
         string aile = kimlik.Split('.', 2)[0];
         decimal taban = AileTabanFiyatlari.TryGetValue(aile, out decimal bulunan)
             ? bulunan
-            : 25m;
+            : 0.38m;
 
         uint karma = 2166136261;
         foreach (char karakter in $"{kimlik}@{hizmetSurumu?.Trim() ?? "1.0"}")
@@ -57,28 +58,24 @@ public static class MotorHizmetFiyatlari
             karma *= 16777619;
         }
 
-        decimal carpan = 0.85m + karma % 41 / 100m;
+        decimal carpan = 0.82m + karma % 37 / 100m;
         if (kimlik.Contains("video", StringComparison.OrdinalIgnoreCase) ||
             kimlik.Contains("saldiri", StringComparison.OrdinalIgnoreCase) ||
             kimlik.Contains("sanal-makine", StringComparison.OrdinalIgnoreCase) ||
             kimlik.Contains("model", StringComparison.OrdinalIgnoreCase))
         {
-            carpan += 0.25m;
+            carpan += 0.30m;
         }
 
-        return decimal.Round(Math.Max(5m, taban * carpan), 2);
+        return decimal.Round(Math.Clamp(taban * carpan, 0.05m, 2.50m), 2);
     }
 
     public static void Uygula(IEnumerable<SirketKaydi> sirketler)
     {
         ArgumentNullException.ThrowIfNull(sirketler);
         foreach (SirketKaydi sirket in sirketler)
-        {
             foreach (SunulanHizmet hizmet in sirket.Hizmetler)
-            {
                 hizmet.BirimFiyat = Fiyat(hizmet.HizmetKimligi, hizmet.HizmetSurumu);
-            }
-        }
     }
 
     public static async Task KaliciEzmeKayitlariniTemizleVeUygulaAsync(
@@ -116,8 +113,7 @@ public static class MotorHizmetFiyatlari
             {
                 durum.HizmetAyarlari ??= new(StringComparer.OrdinalIgnoreCase);
                 durum.HizmetFiyatEzmeDegerleri ??= new(StringComparer.OrdinalIgnoreCase);
-                if (!sirketIndeksi.TryGetValue(durum.SirketKimligi, out SirketKaydi? sirket))
-                    continue;
+                if (!sirketIndeksi.TryGetValue(durum.SirketKimligi, out SirketKaydi? sirket)) continue;
 
                 foreach (SunulanHizmet hizmet in sirket.Hizmetler)
                 {
@@ -125,8 +121,7 @@ public static class MotorHizmetFiyatlari
                     decimal fiyat = Fiyat(hizmet.HizmetKimligi, hizmet.HizmetSurumu);
                     hizmet.BirimFiyat = fiyat;
                     durum.HizmetFiyatEzmeDegerleri[anahtar] = fiyat;
-                    if (!durum.HizmetAyarlari.TryGetValue(anahtar, out HizmetKaliciAyari? ayar))
-                        continue;
+                    if (!durum.HizmetAyarlari.TryGetValue(anahtar, out HizmetKaliciAyari? ayar)) continue;
                     ayar.SunucudanGelenIlkFiyat = fiyat;
                     ayar.YonetilenFiyat = fiyat;
                     ayar.FiyatYonetildi = false;
