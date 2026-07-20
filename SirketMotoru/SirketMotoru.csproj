@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- V9 sınıfları aynı ana sınıf adlarını kullanır; bütün eski panel ve akış sürümleri derlenmez. -->
+    <!-- V9.1 sınıfları aynı ana sınıf adlarını kullanır; bütün eski panel ve akış sürümleri derlenmez. -->
     <Compile Remove="CanliPano/YazilimBorsasiHtml.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV2.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV3.cs" />
@@ -41,6 +41,7 @@
     <Compile Remove="Isletim/SirketIsletimYoneticisi.cs" />
     <Compile Remove="Isletim/KodTabanliSirketIsletimYoneticisi.cs" />
     <Compile Remove="Isletim/EkosistemYoneticisi.cs" />
+    <Compile Remove="Isletim/V9EkonomiYoneticisi.cs" />
 
     <Compile Remove="Isler/IsYoneticisi.cs" />
     <Compile Remove="Isler/IsYoneticisiV2.cs" />
