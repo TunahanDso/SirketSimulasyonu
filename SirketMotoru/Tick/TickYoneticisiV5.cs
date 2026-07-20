@@ -20,6 +20,7 @@ public sealed class TickYoneticisi
     private readonly IsYoneticisi _isler;
     private readonly ProtokolKimlikUzlastiricisi _protokoller;
     private readonly V9IsletimKoordinatoru _isletimKoordinatoru;
+    private readonly V92OlayVeMaliyetYoneticisi _olaylar;
     private long _tick;
     private bool _calisiyor;
 
@@ -32,7 +33,8 @@ public sealed class TickYoneticisi
         MusteriYoneticisi musteriler,
         KodTabanliSirketIsletimYoneticisi isletim,
         EkosistemYoneticisi ekosistem,
-        V9EkonomiYoneticisi v9)
+        V9EkonomiYoneticisi v9,
+        string motorVerileriKlasoru)
     {
         _ayarlar = ayarlar ?? throw new ArgumentNullException(nameof(ayarlar));
         _sirketler = sirketler ?? throw new ArgumentNullException(nameof(sirketler));
@@ -40,9 +42,11 @@ public sealed class TickYoneticisi
         _isletim = isletim ?? throw new ArgumentNullException(nameof(isletim));
         _ekosistem = ekosistem ?? throw new ArgumentNullException(nameof(ekosistem));
         _v9 = v9 ?? throw new ArgumentNullException(nameof(v9));
+        ArgumentException.ThrowIfNullOrWhiteSpace(motorVerileriKlasoru);
         _isler = new IsYoneticisi(sirketler, musteriler, new SonucDogrulayicisi());
         _protokoller = new ProtokolKimlikUzlastiricisi(isletim, ekosistem, sirketler);
         _isletimKoordinatoru = new V9IsletimKoordinatoru(sirketler, isletim);
+        _olaylar = new V92OlayVeMaliyetYoneticisi(sirketler, motorVerileriKlasoru);
         _tick = Math.Max(0, TickSaatDeposu.SonTamamlananTick);
     }
 
@@ -50,9 +54,10 @@ public sealed class TickYoneticisi
     {
         if (_calisiyor) throw new InvalidOperationException("Tick sistemi zaten çalışıyor.");
         _calisiyor = true;
+        await _olaylar.BaslatAsync(cancellationToken);
         KonsolKayitcisi.Basari(
-            $"V9.1 tick sistemi başladı | Son tick: {TickNumarasi} | Hedef aralık: {_ayarlar.TickSuresiSaniye} sn | " +
-            "Tek ekonomi, sabit hizmet fiyatı, fiziksel kapasite tahsisi ve bağımsız SLA akışı aktif.");
+            $"V9.2 tick sistemi başladı | Son tick: {TickNumarasi} | Hedef aralık: {_ayarlar.TickSuresiSaniye} sn | " +
+            "Tek ekonomi, toplu hizmet kapasitesi, çoklu protokol ve piyasa olayları aktif.");
         try
         {
             while (!cancellationToken.IsCancellationRequested)
@@ -69,13 +74,13 @@ public sealed class TickYoneticisi
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
                 catch (Exception hata)
                 {
-                    KonsolKayitcisi.Hata($"V9.1 tick {tick} tamamlanamadı; saat ilerletilmedi: {hata.Message}");
+                    KonsolKayitcisi.Hata($"V9.2 tick {tick} tamamlanamadı; saat ilerletilmedi: {hata.Message}");
                     KonsolKayitcisi.Hata(hata.ToString());
                     throw;
                 }
                 finally { sure.Stop(); }
 
-                KonsolKayitcisi.Bilgi($"V9.1 tick {tick} tamamlandı | Süre: {sure.Elapsed.TotalMilliseconds:N0} ms");
+                KonsolKayitcisi.Bilgi($"V9.2 tick {tick} tamamlandı | Süre: {sure.Elapsed.TotalMilliseconds:N0} ms");
                 TimeSpan bekleme = TimeSpan.FromSeconds(_ayarlar.TickSuresiSaniye) - sure.Elapsed;
                 if (bekleme > TimeSpan.Zero)
                 {
@@ -93,7 +98,7 @@ public sealed class TickYoneticisi
         {
             _calisiyor = false;
             await SonKayitAsync();
-            KonsolKayitcisi.Bilgi("V9.1 tick sistemi durdu.");
+            KonsolKayitcisi.Bilgi("V9.2 tick sistemi durdu.");
         }
     }
 
@@ -106,8 +111,6 @@ public sealed class TickYoneticisi
             _sirketler.SirketKayitlari,
             cancellationToken);
 
-        // Tick başlangıç bilançosu SLA ödemesinden önce alınır; böylece SLA o
-        // tickin gelir/gider ve net sonucunda görünür.
         await _v9.TickOncesiAsync(tick, cancellationToken);
         await _isletimKoordinatoru.TickCalistirAsync(tick, cancellationToken);
         await _ekosistem.PazariHazirlaAsync(tick, cancellationToken);
@@ -120,16 +123,18 @@ public sealed class TickYoneticisi
         CanliPanoDurumDeposu.IslemeOzetiniGuncelle(isOzeti);
 
         await _v9.TickSonuAsync(tick, cancellationToken);
+        await _olaylar.TickSonuAsync(tick, cancellationToken);
         await _sirketler.BilancolariKaydetVeYayinlaAsync(tick, cancellationToken);
         await _musteriler.GerekirseKaydetAsync(tick, cancellationToken);
 
         V9PazarDosyasi pazar = V9PazarDeposu.Getir();
         KonsolKayitcisi.Bilgi(
-            $"V9.1 piyasa özeti | Hizmet talebi {pazar.HizmetTalepleri.Values.Sum(x => x.BuTickTalep):N0} | " +
+            $"V9.2 piyasa özeti | Hizmet talebi {pazar.HizmetTalepleri.Values.Sum(x => x.BuTickTalep):N0} | " +
             $"Hizmet karşılanan {pazar.HizmetTalepleri.Values.Sum(x => x.KarsilananTalep):N0} | " +
             $"OS {pazar.IsletimSistemiTalebi.KarsilananTalep:N0}/{pazar.IsletimSistemiTalebi.BuTickTalep:N0} | " +
             $"Uygulama kategorisi {pazar.UygulamaTalepleri.Count:N0} | " +
-            $"Şirket neti {pazar.SirketOzetleri.Sum(x => x.NetKazanc):N2} TL");
+            $"Şirket neti {pazar.SirketOzetleri.Sum(x => x.NetKazanc):N2} TL | " +
+            $"Haber {pazar.Haberler.Count:N0}");
     }
 
     private async Task SonKayitAsync()
@@ -141,7 +146,7 @@ public sealed class TickYoneticisi
         }
         catch (Exception hata)
         {
-            KonsolKayitcisi.Hata($"V9.1 kapanış kayıtları yazılamadı: {hata.Message}");
+            KonsolKayitcisi.Hata($"V9.2 kapanış kayıtları yazılamadı: {hata.Message}");
         }
     }
 }
