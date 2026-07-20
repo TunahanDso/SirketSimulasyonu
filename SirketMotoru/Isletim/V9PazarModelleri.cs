@@ -5,7 +5,7 @@ namespace SirketMotoru.Isletim;
 
 public sealed class V9PazarDosyasi
 {
-    public int Surum { get; set; } = 9;
+    public int Surum { get; set; } = 92;
     public long SonTick { get; set; }
     public DateTimeOffset GuncellenmeZamani { get; set; } = DateTimeOffset.UtcNow;
     public Dictionary<string, V9TalepKaydi> HizmetTalepleri { get; set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -40,8 +40,6 @@ public sealed class V9TalepKaydi
     public int KarsilanamayanTalep => Math.Max(0, BuTickTalep - KarsilananTalep);
     public double KarsilanmaOrani => BuTickTalep <= 0 ? 0 : Math.Clamp(KarsilananTalep * 100d / BuTickTalep, 0, 100);
 
-    // 200 uygulama kategorisinin teknik kataloğu talep kaydının üzerinde
-    // yayınlanır. Hizmet ve OS kayıtlarında bu alanlar boş/0 döner.
     public string KategoriSektoru => Kategori()?.Sektor ?? string.Empty;
     public string KategoriUrunTuru => Kategori()?.UrunTuru ?? string.Empty;
     public IReadOnlyList<string> ZorunluHizmetler => Kategori()?.ZorunluHizmetler ?? [];
@@ -89,6 +87,12 @@ public sealed class V9SirketKapasiteDurumu
     public int KullanilanKapasite { get; set; }
     public Dictionary<string, int> Tahsisler { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public bool KullaniciElleAyarladi { get; set; }
+    public int HizmetHavuzu => Tahsisler
+        .Where(x => x.Key.StartsWith("hizmet:", StringComparison.OrdinalIgnoreCase))
+        .Sum(x => x.Value);
+    public int UrunHavuzu => Tahsisler
+        .Where(x => x.Key.StartsWith("urun:", StringComparison.OrdinalIgnoreCase))
+        .Sum(x => x.Value);
     public int BosKapasite => Math.Max(0, ToplamFizikselKapasite - AyrilmisKapasite);
     public double DolulukOrani => ToplamFizikselKapasite <= 0 ? 0 : Math.Clamp(KullanilanKapasite * 100d / ToplamFizikselKapasite, 0, 300);
 }
@@ -101,8 +105,10 @@ public sealed class V9SirketPazarOzeti
     public decimal UygulamaGeliri { get; set; }
     public decimal AbonelikGeliri { get; set; }
     public decimal ProtokolGeliri { get; set; }
+    public decimal OlayGeliri { get; set; }
     public decimal IsletmeGideri { get; set; }
     public decimal FinansmanGideri { get; set; }
+    public decimal OlayGideri { get; set; }
     public decimal NetKazanc { get; set; }
     public int AktifUygulamaKullanicisi { get; set; }
     public int IsletimSistemiKullanicisi { get; set; }
@@ -122,6 +128,8 @@ public sealed class V9HaberKaydi
     public string SirketKimligi { get; set; } = string.Empty;
     public string SirketAdi { get; set; } = string.Empty;
     public decimal FinansalEtki { get; set; }
+    public string Rozet { get; set; } = "SON DAKİKA";
+    public string Ikon { get; set; } = "📰";
     public DateTimeOffset Zaman { get; set; } = DateTimeOffset.UtcNow;
 }
 
