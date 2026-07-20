@@ -121,9 +121,12 @@ public sealed class TickYoneticisi
         V93HizmetKapasiteDeposu.TickBaslat(tick);
 
         await _isletimKoordinatoru.TickCalistirAsync(tick, cancellationToken);
+
+        // Yeni ürün/protokol, lansman sermayesi ödenmeden pazara ve kullanıcı
+        // dağıtımına giremez. Yetersiz sermayeli kayıt burada pasifleştirilir.
+        await _yayinMaliyetleri.UygulaAsync(tick, cancellationToken);
         await _ekosistem.PazariHazirlaAsync(tick, cancellationToken);
         await _v9.UrunPazariniVeEkonomiyiIsleAsync(tick, cancellationToken);
-        await _yayinMaliyetleri.UygulaAsync(tick, cancellationToken);
         await _kapasiteDengeleyicisi.RaporuGuncelleAsync(cancellationToken);
 
         _musteriler.TickBasindaMusterileriGuncelle(tick);
