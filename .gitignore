@@ -26,7 +26,7 @@ Desktop.ini
 *.log
 
 # Motor çalışma verileri
-# Bu dosyalar oyunun kalıcı durumudur. Git pull/stash sırasında taşınmamalıdır.
+# V9 ilk açılışta eski durumu arşivler; aşağıdaki dosyalar Git/stash kapsamına alınmaz.
 MotorVerileri/musteriler.json
 MotorVerileri/musteriler.json.tmp
 MotorVerileri/sirket-bilancolari.json
@@ -43,6 +43,8 @@ MotorVerileri/finans-v7.json
 MotorVerileri/finans-v7.json.tmp
 MotorVerileri/pazar-fiyat.json
 MotorVerileri/pazar-fiyat.json.tmp
+MotorVerileri/pazar-v9.json
+MotorVerileri/pazar-v9.json.tmp
 MotorVerileri/ceza-v8.json
 MotorVerileri/ceza-v8.json.tmp
 MotorVerileri/tick-saat.json
@@ -50,4 +52,5 @@ MotorVerileri/tick-saat.json.tmp
 MotorVerileri/tek-seferlik-destekler.json
 MotorVerileri/tek-seferlik-destekler.json.tmp
 MotorVerileri/v8.1-*.json
+MotorVerileri/v9-temiz-sezon-*.json
 MotorVerileri/Arsiv/
