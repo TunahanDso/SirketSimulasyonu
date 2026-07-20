@@ -1,4 +1,5 @@
 using System.Text.Json;
+using SirketMotoru.Hizmetler;
 
 namespace SirketMotoru.Isletim;
 
@@ -38,6 +39,25 @@ public sealed class V9TalepKaydi
     public List<V9ArzPayi> ArzDagilimi { get; set; } = [];
     public int KarsilanamayanTalep => Math.Max(0, BuTickTalep - KarsilananTalep);
     public double KarsilanmaOrani => BuTickTalep <= 0 ? 0 : Math.Clamp(KarsilananTalep * 100d / BuTickTalep, 0, 100);
+
+    // 200 uygulama kategorisinin teknik kataloğu talep kaydının üzerinde
+    // yayınlanır. Hizmet ve OS kayıtlarında bu alanlar boş/0 döner.
+    public string KategoriSektoru => Kategori()?.Sektor ?? string.Empty;
+    public string KategoriUrunTuru => Kategori()?.UrunTuru ?? string.Empty;
+    public IReadOnlyList<string> ZorunluHizmetler => Kategori()?.ZorunluHizmetler ?? [];
+    public IReadOnlyList<string> IzinliEkHizmetAileleri => Kategori()?.IzinliEkHizmetAileleri.OrderBy(x => x).ToList() ?? [];
+    public int AsgariHizmetSayisi => Kategori()?.AsgariHizmetSayisi ?? 0;
+    public int OnerilenHizmetSayisi => Kategori()?.OnerilenHizmetSayisi ?? 0;
+    public int AzamiHizmetSayisi => Kategori()?.AzamiHizmetSayisi ?? 0;
+    public double EkHizmetKaliteKatkisi => Kategori()?.EkHizmetKaliteKatkisi ?? 0;
+    public double TabanKapasiteTuketimi => Kategori()?.TabanKapasiteTuketimi ?? 0;
+    public double KullaniciBasinaKapasiteTuketimi => Kategori()?.KullaniciBasinaKapasiteTuketimi ?? 0;
+
+    private UygulamaKategoriTanimi? Kategori() =>
+        Tur.Equals("uygulama-kategorisi", StringComparison.OrdinalIgnoreCase)
+            ? StandartKatalogV6.UygulamaKategorileri.FirstOrDefault(x =>
+                x.KategoriKimligi.Equals(Anahtar, StringComparison.OrdinalIgnoreCase))
+            : null;
 }
 
 public sealed class V9TalepNoktasi
