@@ -99,17 +99,17 @@ public sealed class TickYoneticisi
 
     private async Task TickCalistirAsync(long tick, CancellationToken cancellationToken)
     {
-        // Bağlantılar yenilendikten sonra işletim saatini ve SLA'ları ilerletir.
-        // Çevrimdışı şirketin SLA süresi, gideri, kredisi ve ürün pazarı donar.
         await _sirketler.TickCalistirAsync(tick, cancellationToken);
-        await _isletimKoordinatoru.TickCalistirAsync(tick, cancellationToken);
         await _protokoller.UygulaAsync(cancellationToken);
         await MotorHizmetFiyatlari.KaliciEzmeKayitlariniTemizleVeUygulaAsync(
             _isletim,
             _sirketler.SirketKayitlari,
             cancellationToken);
 
+        // Tick başlangıç bilançosu SLA ödemesinden önce alınır; böylece SLA o
+        // tickin gelir/gider ve net sonucunda görünür.
         await _v9.TickOncesiAsync(tick, cancellationToken);
+        await _isletimKoordinatoru.TickCalistirAsync(tick, cancellationToken);
         await _ekosistem.PazariHazirlaAsync(tick, cancellationToken);
         await _v9.UrunPazariniVeEkonomiyiIsleAsync(tick, cancellationToken);
 
