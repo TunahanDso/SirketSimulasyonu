@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- 8080: yalnız V11 HTML ve V6 V9.2 veri sunucusu aktiftir. -->
+    <!-- 8080: yalnız V12 HTML ve V6 veri sunucusu aktiftir. -->
     <Compile Remove="CanliPano/YazilimBorsasiHtml.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV2.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV3.cs" />
@@ -19,6 +19,7 @@
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV8.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV9.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiHtmlV10.cs" />
+    <Compile Remove="CanliPano/YazilimBorsasiHtmlV11.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusu.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusuV2.cs" />
     <Compile Remove="CanliPano/YazilimBorsasiSunucusuV3.cs" />
@@ -45,7 +46,7 @@
     <Compile Remove="Isletim/SirketYonetimSunucusuV7.cs" />
     <Compile Remove="Isletim/SirketYonetimSunucusuV8.cs" />
 
-    <!-- V9.2 çekirdeği: yan etkisiz V3 depo, V10 ekosistem, V2 ekonomi ve V5 tick. -->
+    <!-- V9.3 çekirdeği. -->
     <Compile Remove="Isletim/SirketIsletimYoneticisi.cs" />
     <Compile Remove="Isletim/SirketIsletimYoneticisiV2.cs" />
     <Compile Remove="Isletim/KodTabanliSirketIsletimYoneticisi.cs" />
@@ -56,6 +57,7 @@
     <Compile Remove="Isler/IsYoneticisi.cs" />
     <Compile Remove="Isler/IsYoneticisiV2.cs" />
     <Compile Remove="Isler/IsYoneticisiV3.cs" />
+    <Compile Remove="Isler/IsYoneticisiV4.cs" />
     <Compile Remove="Tick/TickYoneticisi.cs" />
     <Compile Remove="Tick/TickYoneticisiV2.cs" />
     <Compile Remove="Tick/TickYoneticisiV3.cs" />
