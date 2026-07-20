@@ -1,13 +1,11 @@
 using System.Text;
 using System.Text.Json;
-using SirketMotoru.Kayit;
 
 namespace SirketMotoru.Isletim;
 
 /// <summary>
-/// V5-V8 döneminden kalan bilanço, borç, destek, ceza, kapasite ve pazar
-/// dosyalarını bir defa arşivleyip temizler. Şirket kodları ve statik motor
-/// ayarları korunur; bütün çalışma verisi yeniden üretilir.
+/// V5-V9 döneminden kalan bütün çalışma verisini bir defa arşivleyip temizler.
+/// Şirket kaynak kodları, manifestleri ve statik motor ayarları korunur.
 /// </summary>
 public static class V9TamReset
 {
@@ -26,7 +24,8 @@ public static class V9TamReset
         "tick-saat.json",
         "tek-seferlik-destekler.json",
         "v8.1-tam-sirket-reset-v2.json",
-        "v8.1-adil-baslangic-v1.json"
+        "v8.1-adil-baslangic-v1.json",
+        "v9-temiz-sezon-1.json"
     ];
 
     public static async Task UygulaAsync(
@@ -36,15 +35,15 @@ public static class V9TamReset
         ArgumentException.ThrowIfNullOrWhiteSpace(motorVerileriKlasoru);
         string kok = Path.GetFullPath(motorVerileriKlasoru);
         Directory.CreateDirectory(kok);
-        string isaret = Path.Combine(kok, "v9-temiz-sezon-1.json");
+        string isaret = Path.Combine(kok, "v9.1-temiz-sezon-2.json");
         if (File.Exists(isaret))
         {
-            KonsolKayitcisi.Bilgi("V9 tam sezon reseti daha önce uygulanmış; çalışma verileri korunuyor.");
+            KonsolKayitcisi.Bilgi("V9.1 tam reset daha önce uygulanmış; yeni sezon ilerlemesi korunuyor.");
             return;
         }
 
         string zaman = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss");
-        string arsiv = Path.Combine(kok, "Arsiv", $"V9-reset-oncesi-{zaman}");
+        string arsiv = Path.Combine(kok, "Arsiv", $"V9.1-reset-oncesi-{zaman}");
         Directory.CreateDirectory(arsiv);
 
         foreach (string ad in CalismaDosyalari)
@@ -58,20 +57,20 @@ public static class V9TamReset
             if (File.Exists(tmp)) File.Delete(tmp);
         }
 
-        // Önceki sürümlerin çalışma artıkları da yeni sezona taşınmaz.
-        foreach (string desen in new[] { "*.tmp", "*destek*.json", "*reset-v*.json" })
+        foreach (string desen in new[] { "*.tmp", "*destek*.json", "*reset-v*.json", "v9-*.json" })
         {
             foreach (string dosya in Directory.EnumerateFiles(kok, desen, SearchOption.TopDirectoryOnly))
             {
-                if (Path.GetFileName(dosya).Equals(Path.GetFileName(isaret), StringComparison.OrdinalIgnoreCase))
-                    continue;
+                if (Path.GetFullPath(dosya).Equals(Path.GetFullPath(isaret), StringComparison.OrdinalIgnoreCase)) continue;
+                string hedef = Path.Combine(arsiv, Path.GetFileName(dosya));
+                if (!File.Exists(hedef)) File.Copy(dosya, hedef);
                 File.Delete(dosya);
             }
         }
 
         var kayit = new
         {
-            surum = "9.0-temiz-sezon-1",
+            surum = "9.1-temiz-sezon-2",
             uygulamaZamani = DateTimeOffset.Now,
             arsiv,
             korunanlar = new[]
@@ -82,13 +81,13 @@ public static class V9TamReset
             },
             sifirlananlar = new[]
             {
-                "şirket kasaları ve bütün bilanço sayaçları",
-                "krediler, temerrütler ve ödenemeyen giderler",
-                "tek seferlik destekler",
+                "şirket kasaları, gelir-gider ve bütün bilanço sayaçları",
+                "yatırım seviyeleri, krediler, temerrütler ve ödenemeyen giderler",
+                "tek seferlik ve geçici destekler",
                 "uygulama, işletim sistemi ve protokol piyasa kayıtları",
-                "satın alınmış veya eski tahsis edilmiş kapasite",
-                "müşteri OS, uygulama, sadakat ve işlem geçmişi",
-                "ceza, finans, pazar, haber ve tick geçmişi"
+                "satın alınmış ve eski tahsis edilmiş bütün kapasite",
+                "müşteri işletim sistemi, uygulama, sadakat ve işlem geçmişi",
+                "ceza, finans, haber, arz-talep ve tick geçmişi"
             }
         };
         string gecici = isaret + ".tmp";
@@ -100,6 +99,6 @@ public static class V9TamReset
         File.Move(gecici, isaret, overwrite: true);
 
         KonsolKayitcisi.Basari(
-            $"V9 TAM RESET tamamlandı | Eski bilanço, borç, destek ve pazar kalıntıları silindi | Arşiv: {arsiv}");
+            $"V9.1 TAM RESET tamamlandı | Bilanço, yatırım, borç, destek ve pazar kalıntıları silindi | Arşiv: {arsiv}");
     }
 }
